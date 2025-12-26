@@ -245,7 +245,21 @@
 
                 // 최초 관리자 설정 (특정 이메일이거나, DB에 유저가 없을 경우)
                 // 여기서는 ga100admin@gmail.com을 관리자로 지정하는 예시
-                const role = email === 'ga100admin@gmail.com' ? 'admin' : 'user';
+                // 회원가입 처리 부분
+const signupEmail = document.getElementById('signupEmail').value;
+// 관리자 이메일 조건 설정
+const isAdmin = (signupEmail === 'ga100adminking@gmail.com');
+
+await setDoc(doc(db, "users", user.uid), {
+    email: signupEmail,
+    nickname: signupNickname,
+    role: isAdmin ? 'admin' : 'user', // 이메일이 일치하면 admin 부여
+    points: 0,
+    courses: [],
+    secretQuestions: 0,
+    createdAt: new Date().toISOString()
+});
+
 
                 // Firestore에 유저 데이터 저장
                 await setDoc(doc(db, "users", user.uid), {
