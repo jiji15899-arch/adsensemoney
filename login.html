@@ -6,19 +6,87 @@
     <title>로그인 - ga100</title>
     <link rel="stylesheet" href="styles.css">
     <style>
-        /* 기존 스타일 유지 */
-        .auth-container { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
-        .auth-box { background: var(--white); padding: 40px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 400px; width: 100%; }
-        .auth-logo { text-align: center; font-size: 36px; font-weight: bold; color: var(--primary); margin-bottom: 30px; }
-        .auth-tabs { display: flex; gap: 10px; margin-bottom: 30px; }
-        .auth-tab { flex: 1; padding: 12px; background: var(--light-gray); border: none; border-radius: 8px; cursor: pointer; font-size: 16px; transition: all 0.2s; }
-        .auth-tab.active { background: var(--primary); color: var(--white); }
-        .auth-form { display: none; }
-        .auth-form.active { display: block; }
-        .submit-btn { width: 100%; padding: 14px; background: var(--primary); color: var(--white); border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
-        .submit-btn:hover { background: var(--primary-dark); }
-        .back-link { text-align: center; margin-top: 20px; }
-        .back-link a { color: var(--primary); text-decoration: none; }
+        .auth-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .auth-box {
+            background: var(--white);
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            max-width: 400px;
+            width: 100%;
+        }
+        .auth-logo {
+            text-align: center;
+            font-size: 36px;
+            font-weight: bold;
+            color: var(--primary);
+            margin-bottom: 30px;
+        }
+        .auth-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+        .auth-tab {
+            flex: 1;
+            padding: 12px;
+            background: var(--light-gray);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.2s;
+        }
+        .auth-tab.active {
+            background: var(--primary);
+            color: var(--white);
+        }
+        .auth-form {
+            display: none;
+        }
+        .auth-form.active {
+            display: block;
+        }
+        .submit-btn {
+            width: 100%;
+            padding: 14px;
+            background: var(--primary);
+            color: var(--white);
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .submit-btn:hover {
+            background: var(--primary-dark);
+        }
+        .submit-btn:disabled {
+            background: var(--gray);
+            cursor: not-allowed;
+        }
+        .back-link {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .back-link a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 10px;
+            color: var(--gray);
+        }
     </style>
 </head>
 <body>
@@ -31,38 +99,40 @@
                 <button class="auth-tab" onclick="switchTab('signup')">회원가입</button>
             </div>
 
+            <!-- Login Form -->
             <form class="auth-form active" id="loginForm" onsubmit="handleLogin(event)">
                 <div id="loginAlert"></div>
                 <div class="form-group">
-                    <label>이메일</label>
-                    <input type="email" id="loginEmail" required placeholder="example@email.com">
+                    <label>닉네임</label>
+                    <input type="text" id="loginNickname" required autocomplete="username">
                 </div>
                 <div class="form-group">
                     <label>비밀번호</label>
-                    <input type="password" id="loginPassword" required>
+                    <input type="password" id="loginPassword" required autocomplete="current-password">
                 </div>
-                <button type="submit" class="submit-btn">로그인</button>
+                <button type="submit" class="submit-btn" id="loginBtn">로그인</button>
+                <div class="loading" id="loginLoading">처리 중...</div>
             </form>
 
+            <!-- Signup Form -->
             <form class="auth-form" id="signupForm" onsubmit="handleSignup(event)">
                 <div id="signupAlert"></div>
                 <div class="form-group">
-                    <label>이메일</label>
-                    <input type="email" id="signupEmail" required placeholder="example@email.com">
-                </div>
-                <div class="form-group">
                     <label>닉네임</label>
-                    <input type="text" id="signupNickname" required>
+                    <input type="text" id="signupNickname" required autocomplete="username">
+                    <small style="color: var(--gray); font-size: 12px;">영문, 숫자 조합 3-20자</small>
                 </div>
                 <div class="form-group">
                     <label>비밀번호</label>
-                    <input type="password" id="signupPassword" required minlength="6">
+                    <input type="password" id="signupPassword" required autocomplete="new-password">
+                    <small style="color: var(--gray); font-size: 12px;">최소 6자 이상</small>
                 </div>
                 <div class="form-group">
                     <label>비밀번호 확인</label>
-                    <input type="password" id="signupPasswordConfirm" required minlength="6">
+                    <input type="password" id="signupPasswordConfirm" required autocomplete="new-password">
                 </div>
-                <button type="submit" class="submit-btn">회원가입</button>
+                <button type="submit" class="submit-btn" id="signupBtn">회원가입</button>
+                <div class="loading" id="signupLoading">처리 중...</div>
             </form>
 
             <div class="back-link">
@@ -71,10 +141,10 @@
         </div>
     </div>
 
-    <script type="module" src="firebase-config.js"></script>
-    
-    <script>
-        function switchTab(tab) {
+    <script type="module">
+        import './firebase-config.js';
+
+        window.switchTab = function(tab) {
             const tabs = document.querySelectorAll('.auth-tab');
             const forms = document.querySelectorAll('.auth-form');
             
@@ -88,118 +158,135 @@
                 tabs[1].classList.add('active');
                 forms[1].classList.add('active');
             }
-        }
+        };
 
-        // 로그인 처리
-        async function handleLogin(e) {
+        window.handleLogin = async function(e) {
             e.preventDefault();
-            const email = document.getElementById('loginEmail').value.trim();
+            
+            const nickname = document.getElementById('loginNickname').value.trim();
             const password = document.getElementById('loginPassword').value;
             const alertDiv = document.getElementById('loginAlert');
+            const loginBtn = document.getElementById('loginBtn');
+            const loading = document.getElementById('loginLoading');
+
+            alertDiv.innerHTML = '';
+            loginBtn.disabled = true;
+            loading.style.display = 'block';
 
             try {
-                // 1. Firebase Auth 로그인
-                const userCredential = await window.firebaseAuth.signInWithEmailAndPassword(window.auth, email, password);
-                const user = userCredential.user;
+                const result = await window.firebaseAuth.signIn(nickname, password);
+                
+                if (result.success) {
+                    // Store user data
+                    sessionStorage.setItem('currentUser', JSON.stringify({
+                        nickname: nickname,
+                        role: result.userData.role
+                    }));
 
-                // 2. Firestore에서 사용자 추가 정보(Role, Blacklist 등) 가져오기
-                const userDocRef = window.firebaseStore.doc(window.db, "users", user.uid);
-                const userDoc = await window.firebaseStore.getDoc(userDocRef);
-
-                if (userDoc.exists()) {
-                    const userData = userDoc.data();
-
-                    // 블랙리스트 체크
-                    if (userData.blacklisted) {
-                        await window.firebaseAuth.signOut(window.auth);
-                        alertDiv.innerHTML = '<div class="alert alert-error">블랙리스트에 등재된 계정입니다. 관리자에게 문의하세요.</div>';
-                        return;
+                    // Redirect based on role
+                    if (result.userData.role === 'admin') {
+                        window.location.href = 'admin.html';
+                    } else {
+                        window.location.href = 'index.html';
                     }
-
-                    // 정지 계정 체크
-                    if (userData.suspended && new Date(userData.suspendedUntil) > new Date()) {
-                        await window.firebaseAuth.signOut(window.auth);
-                        alertDiv.innerHTML = `<div class="alert alert-error">계정이 ${new Date(userData.suspendedUntil).toLocaleDateString()}까지 정지되었습니다.</div>`;
-                        return;
-                    }
-
-                    // 로컬 스토리지에 사용자 정보 캐싱 (성능 및 기존 로직 호환용)
-                    // 중요: 보안을 위해 비밀번호는 저장하지 않음
-                    localStorage.setItem('currentUser', JSON.stringify(userData));
-                    
-                    // 관리자면 admin.html, 아니면 index.html
-                    window.location.href = userData.role === 'admin' ? 'admin.html' : 'index.html';
-                } else {
-                    alertDiv.innerHTML = '<div class="alert alert-error">사용자 정보를 찾을 수 없습니다.</div>';
                 }
-
             } catch (error) {
-                console.error(error);
-                let msg = "로그인 실패: 이메일 또는 비밀번호를 확인해주세요.";
-                if(error.code === 'auth/invalid-credential') msg = "이메일 혹은 비밀번호가 틀렸습니다.";
-                alertDiv.innerHTML = `<div class="alert alert-error">${msg}</div>`;
+                console.error('Login error:', error);
+                let errorMessage = '로그인 중 오류가 발생했습니다.';
+                
+                if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+                    errorMessage = '닉네임 또는 비밀번호가 올바르지 않습니다.';
+                } else if (error.message) {
+                    errorMessage = error.message;
+                }
+                
+                alertDiv.innerHTML = `<div class="alert alert-error">${errorMessage}</div>`;
+                loginBtn.disabled = false;
+                loading.style.display = 'none';
             }
-        }
+        };
 
-        // 회원가입 처리
-        async function handleSignup(e) {
+        window.handleSignup = async function(e) {
             e.preventDefault();
-            const email = document.getElementById('signupEmail').value.trim();
+            
             const nickname = document.getElementById('signupNickname').value.trim();
             const password = document.getElementById('signupPassword').value;
             const passwordConfirm = document.getElementById('signupPasswordConfirm').value;
             const alertDiv = document.getElementById('signupAlert');
+            const signupBtn = document.getElementById('signupBtn');
+            const loading = document.getElementById('signupLoading');
+
+            alertDiv.innerHTML = '';
+
+            // Validate nickname
+            if (nickname.length < 3 || nickname.length > 20) {
+                alertDiv.innerHTML = '<div class="alert alert-error">닉네임은 3-20자여야 합니다.</div>';
+                return;
+            }
+
+            if (!/^[a-zA-Z0-9]+$/.test(nickname)) {
+                alertDiv.innerHTML = '<div class="alert alert-error">닉네임은 영문과 숫자만 사용할 수 있습니다.</div>';
+                return;
+            }
+
+            // Validate password
+            if (password.length < 6) {
+                alertDiv.innerHTML = '<div class="alert alert-error">비밀번호는 최소 6자 이상이어야 합니다.</div>';
+                return;
+            }
 
             if (password !== passwordConfirm) {
                 alertDiv.innerHTML = '<div class="alert alert-error">비밀번호가 일치하지 않습니다.</div>';
                 return;
             }
 
+            signupBtn.disabled = true;
+            loading.style.display = 'block';
+
             try {
-                // 1. 닉네임 중복 체크 (Firestore query)
-                const usersRef = window.firebaseStore.collection(window.db, "users");
-                const q = window.firebaseStore.query(usersRef, window.firebaseStore.where("nickname", "==", nickname));
-                const querySnapshot = await window.firebaseStore.getDocs(q);
-
-                if (!querySnapshot.empty) {
-                    alertDiv.innerHTML = '<div class="alert alert-error">이미 사용 중인 닉네임입니다.</div>';
-                    return;
+                const result = await window.firebaseAuth.signUp(nickname, password);
+                
+                if (result.success) {
+                    alertDiv.innerHTML = '<div class="alert alert-success">회원가입이 완료되었습니다! 로그인해주세요.</div>';
+                    
+                    // Clear form
+                    document.getElementById('signupNickname').value = '';
+                    document.getElementById('signupPassword').value = '';
+                    document.getElementById('signupPasswordConfirm').value = '';
+                    
+                    // Switch to login after 2 seconds
+                    setTimeout(() => window.switchTab('login'), 2000);
                 }
-
-                // 2. Firebase Auth 사용자 생성
-                const userCredential = await window.firebaseAuth.createUserWithEmailAndPassword(window.auth, email, password);
-                const user = userCredential.user;
-
-                // 3. 관리자 여부 확인 (하드코딩된 이메일 체크)
-                const isAdmin = email === "fli501824@gmail.com";
-
-                // 4. Firestore에 사용자 정보 저장
-                const userData = {
-                    uid: user.uid,
-                    email: email,
-                    nickname: nickname,
-                    role: isAdmin ? 'admin' : 'user',
-                    points: isAdmin ? 999999 : 0, // 관리자는 포인트 무제한
-                    courses: [],
-                    secretQuestions: 0,
-                    createdAt: new Date().toISOString(),
-                    blacklisted: false,
-                    suspended: false
-                };
-
-                await window.firebaseStore.setDoc(window.firebaseStore.doc(window.db, "users", user.uid), userData);
-
-                alertDiv.innerHTML = '<div class="alert alert-success">회원가입이 완료되었습니다. 로그인해주세요.</div>';
-                setTimeout(() => switchTab('login'), 1500);
-
             } catch (error) {
-                console.error(error);
-                let msg = "회원가입 중 오류가 발생했습니다.";
-                if (error.code === 'auth/email-already-in-use') msg = "이미 사용 중인 이메일입니다.";
-                if (error.code === 'auth/weak-password') msg = "비밀번호는 6자리 이상이어야 합니다.";
-                alertDiv.innerHTML = `<div class="alert alert-error">${msg}</div>`;
+                console.error('Signup error:', error);
+                let errorMessage = '회원가입 중 오류가 발생했습니다.';
+                
+                if (error.code === 'auth/email-already-in-use') {
+                    errorMessage = '이미 사용 중인 닉네임입니다.';
+                } else if (error.message) {
+                    errorMessage = error.message;
+                }
+                
+                alertDiv.innerHTML = `<div class="alert alert-error">${errorMessage}</div>`;
+                signupBtn.disabled = false;
+                loading.style.display = 'none';
             }
-        }
+        };
+
+        // Check if already logged in
+        window.firebaseAuth.onAuthStateChanged((user) => {
+            if (user) {
+                const currentUser = sessionStorage.getItem('currentUser');
+                if (currentUser) {
+                    const userData = JSON.parse(currentUser);
+                    if (userData.role === 'admin') {
+                        window.location.href = 'admin.html';
+                    } else {
+                        window.location.href = 'index.html';
+                    }
+                }
+            }
+        });
     </script>
 </body>
 </html>
