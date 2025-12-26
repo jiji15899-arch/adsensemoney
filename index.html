@@ -11,7 +11,7 @@
     <header class="header">
         <div class="container">
             <div class="header-content">
-                <h1 class="logo">ga100</h1>
+                <h1 class="logo" onclick="window.location.href='index.html'" style="cursor:pointer">ga100</h1>
                 <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
                 <div class="header-right">
                     <button class="notification-btn" onclick="toggleNotifications()">
@@ -46,7 +46,6 @@
             <h3>강의</h3>
             <ul>
                 <li><a href="courses.html?type=all">올인원 전자책</a></li>
-                <li><a href="courses.html?type=extend">수강 기간 연장하기</a></li>
                 <li><a href="courses.html">모든 강의 보기</a></li>
             </ul>
         </div>
@@ -109,7 +108,7 @@
             <section class="popular-courses">
                 <h2>인기 강의</h2>
                 <div class="course-grid" id="popularCourses">
-                    <!-- Courses will be loaded dynamically -->
+                    <div style="text-align: center; padding: 40px; color: var(--gray);">강의를 불러오는 중...</div>
                 </div>
             </section>
         </div>
@@ -128,20 +127,23 @@
         </div>
     </footer>
 
-    <script src="app.js"></script>
-    <script>
-        // Initialize page
-        document.addEventListener('DOMContentLoaded', () => {
-            initAuth();
-            loadPopularCourses();
-            checkNotifications();
+    <script type="module">
+        import './firebase-config.js';
+
+        let currentUser = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async () => {
+            await initAuth();
+            await loadPopularCourses();
         });
 
-        function initAuth() {
-            const user = JSON.parse(localStorage.getItem('currentUser'));
+        async function initAuth() {
+            const userData = sessionStorage.getItem('currentUser');
             const authBtn = document.getElementById('authBtn');
             
-            if (user) {
+            if (userData) {
+                currentUser = JSON.parse(userData);
                 authBtn.textContent = '로그아웃';
                 authBtn.onclick = logout;
             } else {
@@ -150,109 +152,60 @@
             }
         }
 
-        function handleAuth() {
-            const user = JSON.parse(localStorage.getItem('currentUser'));
-            if (user) {
+        window.handleAuth = function() {
+            if (currentUser) {
                 logout();
             } else {
                 window.location.href = 'login.html';
             }
+        };
+
+        async function logout() {
+            try {
+                await window.firebaseAuth.signOut();
+                sessionStorage.removeItem('currentUser');
+                window.location.reload();
+            } catch (error) {
+                console.error('Logout error:', error);
+                alert('로그아웃 중 오류가 발생했습니다.');
+            }
         }
 
-        function logout() {
-            localStorage.removeItem('currentUser');
-            window.location.reload();
-        }
-
-        function toggleSidebar() {
+        window.toggleSidebar = function() {
             document.getElementById('sidebar').classList.toggle('active');
-        }
+        };
 
-        function toggleNotifications() {
-            const dropdown = document.getElementById('notificationsDropdown');
-            dropdown.classList.toggle('active');
-        }
+        window.toggleNotifications = function() {
+            document.getElementById('notificationsDropdown').classList.toggle('active');
+        };
 
-        function checkNotifications() {
-            const notifications = JSON.parse(localStorage.getItem('notifications') || '[]');
-            const badge = document.getElementById('notificationBadge');
-            const unread = notifications.filter(n => !n.read).length;
-            
-            if (unread > 0) {
-                badge.textContent = unread;
-                badge.style.display = 'block';
-            } else {
-                badge.style.display = 'none';
-            }
+        async function loadPopularCourses() {
+            try {
+                const courses = await window.firebaseDB.getCourses();
+                const container = document.getElementById('popularCourses');
+                
+                if (courses.length === 0) {
+                    container.innerHTML = '<p style="text-align: center; color: var(--gray); padding: 40px;">등록된 강의가 없습니다.</p>';
+                    return;
+                }
 
-            // Load notifications
-            const list = document.getElementById('notificationsList');
-            if (notifications.length > 0) {
-                list.innerHTML = notifications.slice(0, 5).map(n => `
-                    <div class="notification-item ${n.read ? 'read' : ''}" onclick="goToNotification('${n.link}', ${n.id})">
-                        <p>${n.message}</p>
-                        <span class="notification-time">${new Date(n.time).toLocaleString('ko-KR')}</span>
-                    </div>
-                `).join('');
-            }
-        }
-
-        function goToNotification(link, id) {
-            const notifications = JSON.parse(localStorage.getItem('notifications') || '[]');
-            const notification = notifications.find(n => n.id === id);
-            if (notification) {
-                notification.read = true;
-                localStorage.setItem('notifications', JSON.stringify(notifications));
-            }
-            window.location.href = link;
-        }
-
-        function loadPopularCourses() {
-            const courses = JSON.parse(localStorage.getItem('courses') || '[]');
-            const container = document.getElementById('popularCourses');
-            
-            if (courses.length === 0) {
-                // Add default courses
-                const defaultCourses = [
-                    {
-                        id: 1,
-                        title: '애드센스 승인 완벽 가이드',
-                        description: '애드센스 승인을 위한 모든 조건과 최적화 전략',
-                        price: 29000,
-                        image: '📖',
-                        category: '승인'
-                    },
-                    {
-                        id: 2,
-                        title: '수익화 전략 마스터',
-                        description: '월 100만원 수익을 위한 실전 전략',
-                        price: 49000,
-                        image: '💰',
-                        category: '수익화'
-                    }
-                ];
-                localStorage.setItem('courses', JSON.stringify(defaultCourses));
-                displayCourses(defaultCourses);
-            } else {
-                displayCourses(courses.slice(0, 4));
-            }
-        }
-
-        function displayCourses(courses) {
-            const container = document.getElementById('popularCourses');
-            container.innerHTML = courses.map(course => `
-                <div class="course-card" onclick="window.location.href='course-detail.html?id=${course.id}'">
-                    <div class="course-image">${course.image}</div>
-                    <div class="course-content">
-                        <span class="course-category">${course.category}</span>
-                        <h3>${course.title}</h3>
-                        <p>${course.description}</p>
-                        <div class="course-footer">
-                            <span class="course-price">${course.price === 0 ? '무료' : course.price.toLocaleString() + '원'}</span>
+                container.innerHTML = courses.slice(0, 4).map(course => `
+                    <div class="course-card" onclick="window.location.href='course-detail.html?id=${course.id}'">
+                        <div class="course-image">${course.image || '📖'}</div>
+                        <div class="course-content">
+                            <span class="course-category">${course.category}</span>
+                            <h3>${course.title}</h3>
+                            <p>${course.description}</p>
+                            <div class="course-footer">
+                                <span class="course-price">${course.price === 0 ? '무료' : course.price.toLocaleString() + '원'}</span>
+                            </div>
                         </div>
                     </div>
-                </div>
-            `).join('');
+                `).join('');
+            } catch (error) {
+                console.error('Error loading courses:', error);
+                document.getElementById('popularCourses').innerHTML = '<p style="text-align: center; color: var(--danger); padding: 40px;">강의를 불러오는 중 오류가 발생했습니다.</p>';
+            }
         }
 
         // Close dropdowns when clicking outside
@@ -266,4 +219,4 @@
         });
     </script>
 </body>
-  </html>
+</html>
