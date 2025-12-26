@@ -1,10 +1,11 @@
 // firebase-config.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, doc, getDoc, setDoc, updateDoc, getDocs, query, where, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getFirestore } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getStorage } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
-// ⚠️ 1단계에서 복사한 본인의 설정 코드로 덮어씌우세요!
 const firebaseConfig = {
-    apiKey: "AIzaSyBpdPkp-85uXWklJq00vAy38lx-JTbrjC0",
+  apiKey: "AIzaSyBpdPkp-85uXWklJq00vAy38lx-JTbrjC0",
   authDomain: "ga100-adsensebook.firebaseapp.com",
   projectId: "ga100-adsensebook",
   storageBucket: "ga100-adsensebook.firebasestorage.app",
@@ -14,26 +15,14 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
 const db = getFirestore(app);
+const storage = getStorage(app);
 
-// 초보자를 위한 "데이터베이스 도우미" 함수들 (이걸 가져다 쓰면 됩니다)
-export const DB = {
-    // 회원가입/로그인 관련
-    async getUser(nickname) {
-        const q = query(collection(db, "users"), where("nickname", "==", nickname));
-        const snapshot = await getDocs(q);
-        if (snapshot.empty) return null;
-        return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
-    },
-    async createUser(userData) {
-        // 비밀번호가 그대로 보이면 안되지만, 초보자용이므로 일단 저장 (나중에 보안 강화 필요)
-        await addDoc(collection(db, "users"), userData);
-    },
-    async updateUser(docId, data) {
-        await updateDoc(doc(db, "users", docId), data);
-    },
+window.auth = auth;
+window.db = db;
 
-    // 결제 요청 관련
+export { auth, db, storage };
     async addPaymentRequest(request) {
         await addDoc(collection(db, "payments"), request);
     },
