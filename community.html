@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>커뮤니티 - ga100</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <h1 class="logo" onclick="window.location.href='index.html'" style="cursor:pointer">ga100</h1>
+                <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+            </div>
+        </div>
+    </header>
+
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h2>ga100</h2>
+            <button class="close-sidebar" onclick="toggleSidebar()">✕</button>
+        </div>
+        <div class="sidebar-section">
+            <button class="auth-btn" id="authBtn" onclick="handleAuth()">로그인</button>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <div class="container">
+            <h2 style="margin-bottom: 30px;">커뮤니티</h2>
+
+            <div class="admin-tabs">
+                <button class="admin-tab active" onclick="switchTab('notice')">공지사항</button>
+                <button class="admin-tab" onclick="switchTab('secret')">시크릿 1:1 질문</button>
+                <button class="admin-tab" onclick="switchTab('tips')">제자 노하우</button>
+                <button class="admin-tab" onclick="switchTab('free')">자유게시판</button>
+                <button class="admin-tab" onclick="switchTab('qna')">질문/답변</button>
+            </div>
+
+            <!-- Notice -->
+            <div class="admin-content active" id="notice-content">
+                <div style="margin-bottom: 20px;" id="noticeWriteBtn"></div>
+                <div id="noticeList"></div>
+            </div>
+
+            <!-- Secret Questions -->
+            <div class="admin-content" id="secret-content">
+                <div style="margin-bottom: 20px;" id="secretWriteBtn"></div>
+                <div id="secretList"></div>
+            </div>
+
+            <!-- Tips -->
+            <div class="admin-content" id="tips-content">
+                <div style="margin-bottom: 20px;">
+                    <button class="btn btn-primary" onclick="showPostForm('tips')" id="tipsBtn">노하우 작성</button>
+                </div>
+                <div id="tipsList"></div>
+            </div>
+
+            <!-- Free Board -->
+            <div class="admin-content" id="free-content">
+                <div style="margin-bottom: 20px;">
+                    <button class="btn btn-primary" onclick="showPostForm('free')" id="freeBtn">글 작성</button>
+                </div>
+                <div id="freeList"></div>
+            </div>
+
+            <!-- QnA -->
+            <div class="admin-content" id="qna-content">
+                <div style="margin-bottom: 20px;">
+                    <button class="btn btn-primary" onclick="showPostForm('qna')" id="qnaBtn">질문 작성</button>
+                </div>
+                <div id="qnaList"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Post Form Modal -->
+    <div class="modal" id="postModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">글 작성</h3>
+                <button class="modal-close" onclick="closePostModal()">✕</button>
+            </div>
+            <form onsubmit="submitPost(event)">
+                <div class="form-group">
+                    <label>제목</label>
+                    <input type="text" id="postTitle" required>
+                </div>
+                <div class="form-group">
+                    <label>내용</label>
+                    <textarea id="postContent" required style="min-height: 200px;"></textarea>
+                </div>
+                <div id="postAlert"></div>
+                <button type="submit" class="btn btn-primary">등록</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Post Detail Modal -->
+    <div class="modal" id="detailModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>게시글</h3>
+                <button class="modal-close" onclick="closeDetailModal()">✕</button>
+            </div>
+            <div id="postDetail"></div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-links">
+                <a href="my-home.html">마이홈</a>
+                <a href="revenue.html">수익인증</a>
+                <a href="courses.html">전자책</a>
+                <a href="community.html">커뮤니티</a>
+            </div>
+            <p class="copyright">© 2024 ga100. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+        let currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        let currentPostType = '';
+        const urlParams = new URLSearchParams(window.location.search);
+        const initialTab = urlParams.get('tab') || 'notice';
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('active');
+        }
+
+        function handleAuth() {
+            if (currentUser) {
+                localStorage.removeItem('currentUser');
+                window.location.reload();
+            } else {
+                window.location.href = 'login.html';
+            }
+        }
+
+        function initAuth() {
+            const authBtn = document.getElementById('authBtn');
+            
+            if (currentUser) {
+                authBtn.textContent = '로그아웃';
+                initWriteButtons();
+            } else {
+                authBtn.textContent = '로그인';
+                ['tipsBtn', 'freeBtn', 'qnaBtn'].forEach(id => {
+                    const btn = document.getElementById(id);
+                    if (btn) btn.disabled = true;
+                });
+            }
+        }
+
+        function initWriteButtons() {
+            // Notice write button (admin/manager only)
+            if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager')) {
+                document.getElementById('noticeWriteBtn').innerHTML = '<button class="btn btn-primary" onclick="showPostForm(\'notice\')">공지 작성</button>';
+            }
+
+            // Secret question button
+            const secretQuestions = currentUser?.secretQuestions || 0;
+            document.getElementById('secretWriteBtn').innerHTML = `
+                <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                    <button class="btn btn-primary" onclick="showPostForm('secret')" ${secretQuestions === 0 ? 'disabled' : ''}>시크릿 질문하기</button>
+                    <span style="color: var(--gray);">보유 질문권: ${secretQuestions}개</span>
+                </div>
+            `;
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.admin-content').forEach(c => c.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(tab + '-content').classList.add('active');
+            
+            loadPosts(tab);
+        }
+
+        function showPostForm(type) {
+            if (!currentUser) {
+                alert('로그인이 필요합니다.');
+                window.location.href = 'login.html';
+                return;
+            }
+
+            if (type === 'notice' && currentUser.role !== 'admin' && currentUser.role !== 'manager') {
+                alert('공지는 관리자만 작성할 수 있습니다.');
+                return;
+            }
+
+            if (type === 'secret' && (currentUser.secretQuestions || 0) === 0) {
+                alert('시크릿 질문권이 없습니다.');
+                return;
+            }
+
+            currentPostType = type;
+            const titles = {
+                'notice': '공지 작성',
+                'secret': '시크릿 질문 작성',
+                'tips': '노하우 작성',
+                'free': '자유게시판 글 작성',
+                'qna': '질문 작성'
+            };
+            document.getElementById('modalTitle').textContent = titles[type];
+            document.getElementById('postModal').classList.add('active');
+        }
+
+        function closePostModal() {
+            document.getElementById('postModal').classList.remove('active');
+            document.getElementById('postTitle').value = '';
+            document.getElementById('postContent').value = '';
+            document.getElementById('postAlert').innerHTML = '';
+        }
+
+        function submitPost(e) {
+            e.preventDefault();
+            
+            const title = document.getElementById('postTitle').value.trim();
+            const content = document.getElementById('postContent').value.trim();
+
+            let posts = JSON.parse(localStorage.getItem('posts') || '[]');
+            
+            const newPost = {
+                id: Date.now(),
+                type: currentPostType,
+                title: title,
+                content: content,
+                author: currentUser.nickname,
+                createdAt: new Date().toISOString(),
+                comments: []
+            };
+
+            posts.unshift(newPost);
+            localStorage.setItem('posts', JSON.stringify(posts));
+
+            // Deduct secret question if type is secret
+            if (currentPostType === 'secret') {
+                let users = JSON.parse(localStorage.getItem('users') || '[]');
+                const userIndex = users.findIndex(u => u.nickname === currentUser.nickname);
+                users[userIndex].secretQuestions--;
+                localStorage.setItem('users', JSON.stringify(users));
+                localStorage.setItem('currentUser', JSON.stringify(users[userIndex]));
+                currentUser = users[userIndex];
+            }
+
+            // Add points for community posts
+            if (currentPostType === 'tips' || currentPostType === 'free') {
+                let users = JSON.parse(localStorage.getItem('users') || '[]');
+                const userIndex = users.findIndex(u => u.nickname === currentUser.nickname);
+                users[userIndex].secretQuestions = (users[userIndex].secretQuestions || 0) + 2;
+                localStorage.setItem('users', JSON.stringify(users));
+                localStorage.setItem('currentUser', JSON.stringify(users[userIndex]));
+                currentUser = users[userIndex];
+            }
+
+            alert('게시글이 등록되었습니다!');
+            closePostModal();
+            loadPosts(currentPostType);
+            initWriteButtons();
+        }
+
+        function loadPosts(type) {
+            const posts = JSON.parse(localStorage.getItem('posts') || '[]');
+            const filteredPosts = posts.filter(p => p.type === type);
+            const listId = type + 'List';
+            const list = document.getElementById(listId);
+
+            if (filteredPosts.length === 0) {
+                list.innerHTML = '<p style="color: var(--gray); padding: 40px; text-align: center;">게시글이 없습니다.</p>';
+                return;
+            }
+
+            list.innerHTML = filteredPosts.map(post => `
+                <div class="admin-panel" style="cursor: pointer; margin-bottom: 15px;" onclick="showPostDetail(${post.id})">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                        <h4 style="margin: 0;">${post.title}</h4>
+                        <span style="color: var(--gray); font-size: 14px; white-space: nowrap; margin-left: 10px;">${new Date(post.createdAt).toLocaleDateString('ko-KR')}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color: var(--gray); font-size: 14px;">${post.author}</span>
+                        <span style="color: var(--gray); font-size: 14px;">💬 ${post.comments.length}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function showPostDetail(postId) {
+            const posts = JSON.parse(localStorage.getItem('posts') || '[]');
+            const post = posts.find(p => p.id === postId);
+
+            if (!post) return;
+
+            const detailHtml = `
+                <div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border);">
+                    <h3 style="margin-bottom: 10px;">${post.title}</h3>
+                    <div style="display: flex; gap: 15px; color: var(--gray); font-size: 14px; margin-bottom: 15px;">
+                        <span>${post.author}</span>
+                        <span>${new Date(post.createdAt).toLocaleString('ko-KR')}</span>
+                    </div>
+                    <p style="line-height: 1.8; white-space: pre-wrap;">${post.content}</p>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <h4 style="margin-bottom: 15px;">댓글 ${post.comments.length}개</h4>
+                    <div id="commentsList">
+                        ${post.comments.map(comment => `
+                            <div style="background: var(--light-gray); padding: 15px; border-radius: 8px; margin-bottom: 10px;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                    <strong>${comment.author}</strong>
+                                    <span style="color: var(--gray); font-size: 12px;">${new Date(comment.createdAt).toLocaleString('ko-KR')}</span>
+                                </div>
+                                <p style="margin: 0;">${comment.content}</p>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                
+                ${currentUser ? `
+                    <form onsubmit="addComment(event, ${postId})">
+                        <div class="form-group">
+                            <label>댓글 작성</label>
+                            <textarea id="commentContent" required style="min-height: 80px;"></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">댓글 등록</button>
+                    </form>
+                ` : '<p style="color: var(--gray); text-align: center;">댓글을 작성하려면 로그인이 필요합니다.</p>'}
+            `;
+
+            document.getElementById('postDetail').innerHTML = detailHtml;
+            document.getElementById('detailModal').classList.add('active');
+        }
+
+        function closeDetailModal() {
+            document.getElementById('detailModal').classList.remove('active');
+        }
+
+        function addComment(e, postId) {
+            e.preventDefault();
+            
+            const content = document.getElementById('commentContent').value.trim();
+            if (!content) return;
+
+            let posts = JSON.parse(localStorage.getItem('posts') || '[]');
+            const postIndex = posts.findIndex(p => p.id === postId);
+            
+            posts[postIndex].comments.push({
+                id: Date.now(),
+                author: currentUser.nickname,
+                content: content,
+                createdAt: new Date().toISOString()
+            });
+
+            localStorage.setItem('posts', JSON.stringify(posts));
+
+            // Add secret question for comment
+            let users = JSON.parse(localStorage.getItem('users') || '[]');
+            const userIndex = users.findIndex(u => u.nickname === currentUser.nickname);
+            users[userIndex].secretQuestions = (users[userIndex].secretQuestions || 0) + 1;
+            localStorage.setItem('users', JSON.stringify(users));
+            localStorage.setItem('currentUser', JSON.stringify(users[userIndex]));
+            currentUser = users[userIndex];
+
+            alert('댓글이 등록되었습니다! 시크릿 질문권 1개를 획득했습니다.');
+            showPostDetail(postId);
+            initWriteButtons();
+        }
+
+        // Initialize
+        initAuth();
+        
+        // Set initial tab
+        document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.admin-content').forEach(c => c.classList.remove('active'));
+        
+        const tabButtons = ['notice', 'secret', 'tips', 'free', 'qna'];
+        const tabIndex = tabButtons.indexOf(initialTab);
+        if (tabIndex >= 0) {
+            document.querySelectorAll('.admin-tab')[tabIndex].classList.add('active');
+            document.getElementById(initialTab + '-content').classList.add('active');
+            loadPosts(initialTab);
+        }
+
+        // Load all posts
+        tabButtons.forEach(tab => loadPosts(tab));
+    </script>
+</body>
+  </html>
