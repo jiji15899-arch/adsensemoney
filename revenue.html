@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>수익인증 - ga100</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <h1 class="logo" onclick="window.location.href='index.html'" style="cursor:pointer">ga100</h1>
+                <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+            </div>
+        </div>
+    </header>
+
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h2>ga100</h2>
+            <button class="close-sidebar" onclick="toggleSidebar()">✕</button>
+        </div>
+        <div class="sidebar-section">
+            <button class="auth-btn" id="authBtn" onclick="handleAuth()">로그인</button>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <div class="container">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; flex-wrap: wrap; gap: 15px;">
+                <h2>수익 인증</h2>
+                <button class="btn btn-primary" onclick="showUploadForm()" id="uploadBtn" style="display: none;">수익 인증 등록</button>
+            </div>
+
+            <div id="uploadFormContainer" style="display: none;">
+                <div class="admin-panel" style="margin-bottom: 30px;">
+                    <h3>수익 인증 등록</h3>
+                    <form onsubmit="submitRevenue(event)">
+                        <div class="form-group">
+                            <label>수익 금액 (원)</label>
+                            <input type="number" id="revenueAmount" required min="0">
+                        </div>
+                        <div class="form-group">
+                            <label>소감 (필수)</label>
+                            <textarea id="revenueThoughts" required placeholder="수익에 대한 소감을 작성해주세요..." style="min-height: 100px;"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>노하우/팁 (선택)</label>
+                            <textarea id="revenueTips" placeholder="수익 창출 노하우나 팁을 공유해주세요..." style="min-height: 100px;"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>수익 창출 주제 (선택)</label>
+                            <input type="text" id="revenueSubject" placeholder="예: 블로그, 유튜브, 웹사이트 등">
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button type="submit" class="btn btn-primary">등록하기</button>
+                            <button type="button" class="btn btn-secondary" onclick="hideUploadForm()">취소</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div id="revenueList"></div>
+
+            <div id="emptyState" style="display: none; text-align: center; padding: 60px 20px;">
+                <div style="font-size: 64px; margin-bottom: 20px;">💰</div>
+                <h3 style="margin-bottom: 10px;">아직 수익 인증이 없습니다</h3>
+                <p style="color: var(--gray);">첫 번째 수익 인증을 등록해보세요!</p>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-links">
+                <a href="my-home.html">마이홈</a>
+                <a href="revenue.html">수익인증</a>
+                <a href="courses.html">전자책</a>
+                <a href="community.html">커뮤니티</a>
+            </div>
+            <p class="copyright">© 2024 ga100. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+        let currentUser = JSON.parse(localStorage.getItem('currentUser'));
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('active');
+        }
+
+        function handleAuth() {
+            if (currentUser) {
+                localStorage.removeItem('currentUser');
+                window.location.reload();
+            } else {
+                window.location.href = 'login.html';
+            }
+        }
+
+        function initAuth() {
+            const authBtn = document.getElementById('authBtn');
+            const uploadBtn = document.getElementById('uploadBtn');
+            
+            if (currentUser) {
+                authBtn.textContent = '로그아웃';
+                uploadBtn.style.display = 'block';
+            } else {
+                authBtn.textContent = '로그인';
+                uploadBtn.style.display = 'none';
+            }
+        }
+
+        function showUploadForm() {
+            document.getElementById('uploadFormContainer').style.display = 'block';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function hideUploadForm() {
+            document.getElementById('uploadFormContainer').style.display = 'none';
+            document.getElementById('revenueAmount').value = '';
+            document.getElementById('revenueThoughts').value = '';
+            document.getElementById('revenueTips').value = '';
+            document.getElementById('revenueSubject').value = '';
+        }
+
+        function submitRevenue(e) {
+            e.preventDefault();
+
+            const amount = parseInt(document.getElementById('revenueAmount').value);
+            const thoughts = document.getElementById('revenueThoughts').value.trim();
+            const tips = document.getElementById('revenueTips').value.trim();
+            const subject = document.getElementById('revenueSubject').value.trim();
+
+            let revenues = JSON.parse(localStorage.getItem('revenues') || '[]');
+            
+            revenues.unshift({
+                id: Date.now(),
+                author: currentUser.nickname,
+                amount: amount,
+                thoughts: thoughts,
+                tips: tips,
+                subject: subject,
+                createdAt: new Date().toISOString()
+            });
+
+            localStorage.setItem('revenues', JSON.stringify(revenues));
+            
+            alert('수익 인증이 등록되었습니다!');
+            hideUploadForm();
+            loadRevenues();
+        }
+
+        function loadRevenues() {
+            const revenues = JSON.parse(localStorage.getItem('revenues') || '[]');
+            const list = document.getElementById('revenueList');
+            const emptyState = document.getElementById('emptyState');
+
+            if (revenues.length === 0) {
+                list.innerHTML = '';
+                emptyState.style.display = 'block';
+                return;
+            }
+
+            emptyState.style.display = 'none';
+            list.innerHTML = revenues.map(revenue => `
+                <div class="admin-panel" style="margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
+                                <strong style="font-size: 18px;">${revenue.author}</strong>
+                                ${revenue.subject ? `<span class="badge badge-success">${revenue.subject}</span>` : ''}
+                            </div>
+                            <span style="color: var(--gray); font-size: 14px;">${new Date(revenue.createdAt).toLocaleDateString('ko-KR')}</span>
+                        </div>
+                        <div style="font-size: 28px; font-weight: bold; color: var(--primary);">
+                            ${revenue.amount.toLocaleString()}원
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 15px;">
+                        <strong style="color: var(--dark); margin-bottom: 8px; display: block;">💭 소감</strong>
+                        <p style="line-height: 1.6; color: var(--dark);">${revenue.thoughts}</p>
+                    </div>
+                    
+                    ${revenue.tips ? `
+                        <div style="margin-bottom: 15px; padding: 15px; background: var(--light-gray); border-radius: 8px;">
+                            <strong style="color: var(--dark); margin-bottom: 8px; display: block;">💡 노하우/팁</strong>
+                            <p style="line-height: 1.6; color: var(--dark);">${revenue.tips}</p>
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+        }
+
+        // Initialize
+        initAuth();
+        loadRevenues();
+    </script>
+</body>
+</html>
