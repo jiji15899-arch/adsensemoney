@@ -635,3 +635,32 @@ body {
     font-size: 24px;
     cursor: pointer;
   }
+/* 기존 styles.css 파일의 맨 아래에 다음을 추가하거나 덮어씌우세요 */
+
+/* Download Button Style */
+.download-btn {
+    display: block;
+    width: 100%;
+    padding: 15px;
+    background: var(--success);
+    color: var(--white);
+    text-align: center;
+    text-decoration: none;
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: bold;
+    margin-top: 15px;
+    transition: all 0.2s;
+}
+
+.download-btn:hover {
+    background: #059669;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+/* Modal Enhancements */
+.modal-content {
+    max-width: 500px;
+    width: 90%;
+}
