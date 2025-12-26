@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>관리자 페이지 - ga100</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <h1 class="logo" onclick="window.location.href='index.html'" style="cursor:pointer">ga100</h1>
+                <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+                <div class="header-right">
+                    <span style="color: var(--primary); font-weight: bold; margin-right: 15px;">👑 관리자</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h2>ga100</h2>
+            <button class="close-sidebar" onclick="toggleSidebar()">✕</button>
+        </div>
+        <div class="sidebar-section">
+            <button class="auth-btn" onclick="logout()">로그아웃</button>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <div class="container">
+            <h2 style="margin-bottom: 30px;">관리자 대시보드</h2>
+
+            <div class="admin-tabs">
+                <button class="admin-tab active" onclick="switchAdminTab('courses')">강의 관리</button>
+                <button class="admin-tab" onclick="switchAdminTab('users')">회원 관리</button>
+                <button class="admin-tab" onclick="switchAdminTab('blacklist')">블랙리스트</button>
+                <button class="admin-tab" onclick="switchAdminTab('payments')">결제 승인</button>
+                <button class="admin-tab" onclick="switchAdminTab('stats')">통계</button>
+            </div>
+
+            <!-- Course Management -->
+            <div class="admin-content active" id="courses-content">
+                <div class="admin-panel">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3>강의 목록</h3>
+                        <button class="btn btn-primary" onclick="showCourseForm()">강의 추가</button>
+                    </div>
+                    <div id="coursesList"></div>
+                </div>
+            </div>
+
+            <!-- User Management -->
+            <div class="admin-content" id="users-content">
+                <div class="admin-panel">
+                    <h3 style="margin-bottom: 20px;">회원 목록</h3>
+                    <div id="usersList"></div>
+                </div>
+            </div>
+
+            <!-- Blacklist -->
+            <div class="admin-content" id="blacklist-content">
+                <div class="admin-panel">
+                    <h3 style="margin-bottom: 20px;">블랙리스트</h3>
+                    <div id="blacklistList"></div>
+                </div>
+            </div>
+
+            <!-- Payments -->
+            <div class="admin-content" id="payments-content">
+                <div class="admin-panel">
+                    <h3 style="margin-bottom: 20px;">결제 승인 대기</h3>
+                    <p style="color: var(--gray);">결제 승인 기능은 실제 백엔드 시스템이 필요합니다.</p>
+                </div>
+            </div>
+
+            <!-- Statistics -->
+            <div class="admin-content" id="stats-content">
+                <div class="admin-panel">
+                    <h3 style="margin-bottom: 20px;">통계</h3>
+                    <div id="statsContainer"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Course Form Modal -->
+    <div class="modal" id="courseModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="courseModalTitle">강의 추가</h3>
+                <button class="modal-close" onclick="closeCourseModal()">✕</button>
+            </div>
+            <form onsubmit="submitCourse(event)">
+                <div class="form-group">
+                    <label>강의 제목</label>
+                    <input type="text" id="courseTitle" required>
+                </div>
+                <div class="form-group">
+                    <label>설명</label>
+                    <textarea id="courseDescription" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label>가격 (원, 0은 무료)</label>
+                    <input type="number" id="coursePrice" required min="0">
+                </div>
+                <div class="form-group">
+                    <label>카테고리</label>
+                    <select id="courseCategory" required>
+                        <option value="승인">승인</option>
+                        <option value="수익화">수익화</option>
+                        <option value="최적화">최적화</option>
+                        <option value="고급">고급</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>이모지 아이콘</label>
+                    <input type="text" id="courseImage" placeholder="📖" maxlength="2">
+                </div>
+                <div class="form-group">
+                    <label>강의 내용</label>
+                    <textarea id="courseContent" required style="min-height: 200px;"></textarea>
+                </div>
+                <input type="hidden" id="courseId">
+                <button type="submit" class="btn btn-primary">저장</button>
+            </form>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <div class="container">
+            <p class="copyright">© 2024 ga100. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+        let currentUser = JSON.parse(localStorage.getItem('currentUser'));
+
+        if (!currentUser || currentUser.role !== 'admin') {
+            alert('관리자 권한이 필요합니다.');
+            window.location.href = 'index.html';
+        }
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('active');
+        }
+
+        function logout() {
+            localStorage.removeItem('currentUser');
+            window.location.href = 'index.html';
+        }
+
+        function switchAdminTab(tab) {
+            document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.admin-content').forEach(c => c.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(tab + '-content').classList.add('active');
+            
+            if (tab === 'courses') loadCourses();
+            if (tab === 'users') loadUsers();
+            if (tab === 'blacklist') loadBlacklist();
+            if (tab === 'stats') loadStats();
+        }
+
+        function loadCourses() {
+            const courses = JSON.parse(localStorage.getItem('courses') || '[]');
+            const list = document.getElementById('coursesList');
+
+            if (courses.length === 0) {
+                list.innerHTML = '<p style="color: var(--gray); padding: 20px;">등록된 강의가 없습니다.</p>';
+                return;
+            }
+
+            list.innerHTML = `
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>제목</th>
+                            <th>카테고리</th>
+                            <th>가격</th>
+                            <th>등록일</th>
+                            <th>관리</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${courses.map(course => `
+                            <tr>
+                                <td>${course.image} ${course.title}</td>
+                                <td><span class="badge badge-success">${course.category}</span></td>
+                                <td>${course.price === 0 ? '무료' : course.price.toLocaleString() + '원'}</td>
+                                <td>${new Date(course.createdAt).toLocaleDateString('ko-KR')}</td>
+                                <td>
+                                    <button class="btn btn-primary" style="padding: 6px 12px; font-size: 14px; margin-right: 5px;" onclick="editCourse(${course.id})">수정</button>
+                                    <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 14px; background: var(--danger);" onclick="deleteCourse(${course.id})">삭제</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function showCourseForm(courseId = null) {
+            const modal = document.getElementById('courseModal');
+            const title = document.getElementById('courseModalTitle');
+            
+            if (courseId) {
+                const courses = JSON.parse(localStorage.getItem('courses') || '[]');
+                const course = courses.find(c => c.id === courseId);
+                
+                if (course) {
+                    title.textContent = '강의 수정';
+                    document.getElementById('courseId').value = course.id;
+                    document.getElementById('courseTitle').value = course.title;
+                    document.getElementById('courseDescription').value = course.description;
+                    document.getElementById('coursePrice').value = course.price;
+                    document.getElementById('courseCategory').value = course.category;
+                    document.getElementById('courseImage').value = course.image;
+                    document.getElementById('courseContent').value = course.content;
+                }
+            } else {
+                title.textContent = '강의 추가';
+                document.getElementById('courseId').value = '';
+                document.getElementById('courseTitle').value = '';
+                document.getElementById('courseDescription').value = '';
+                document.getElementById('coursePrice').value = '';
+                document.getElementById('courseCategory').value = '승인';
+                document.getElementById('courseImage').value = '📖';
+                document.getElementById('courseContent').value = '';
+            }
+            
+            modal.classList.add('active');
+        }
+
+        function editCourse(id) {
+            showCourseForm(id);
+        }
+
+        function closeCourseModal() {
+            document.getElementById('courseModal').classList.remove('active');
+        }
+
+        function submitCourse(e) {
+            e.preventDefault();
+            
+            let courses = JSON.parse(localStorage.getItem('courses') || '[]');
+            const courseId = document.getElementById('courseId').value;
+            
+            const courseData = {
+                title: document.getElementById('courseTitle').value.trim(),
+                description: document.getElementById('courseDescription').value.trim(),
+                price: parseInt(document.getElementById('coursePrice').value),
+                category: document.getElementById('courseCategory').value,
+                image: document.getElementById('courseImage').value.trim() || '📖',
+                content: document.getElementById('courseContent').value.trim()
+            };
+
+            if (courseId) {
+                // Update existing course
+                const index = courses.findIndex(c => c.id === parseInt(courseId));
+                courses[index] = { ...courses[index], ...courseData };
+            } else {
+                // Add new course
+                courses.push({
+                    id: Date.now(),
+                    ...courseData,
+                    createdAt: new Date().toISOString()
+                });
+            }
+
+            localStorage.setItem('courses', JSON.stringify(courses));
+            
+            // Update admin's courses
+            let users = JSON.parse(localStorage.getItem('users') || '[]');
+            const adminIndex = users.findIndex(u => u.role === 'admin');
+            if (adminIndex >= 0) {
+                users[adminIndex].courses = courses.map(c => c.id);
+                localStorage.setItem('users', JSON.stringify(users));
+            }
+
+            alert('강의가 저장되었습니다!');
+            closeCourseModal();
+            loadCourses();
+        }
+
+        function deleteCourse(id) {
+            if (!confirm('정말 이 강의를 삭제하시겠습니까?')) return;
+            
+            let courses = JSON.parse(localStorage.getItem('courses') || '[]');
+            courses = courses.filter(c => c.id !== id);
+            localStorage.setItem('courses', JSON.stringify(courses));
+            
+            alert('강의가 삭제되었습니다.');
+            loadCourses();
+        }
+
+        function loadUsers() {
+            const users = JSON.parse(localStorage.getItem('users') || '[]');
+            const regularUsers = users.filter(u => u.role !== 'admin');
+            const list = document.getElementById('usersList');
+
+            if (regularUsers.length === 0) {
+                list.innerHTML = '<p style="color: var(--gray); padding: 20px;">회원이 없습니다.</p>';
+                return;
+            }
+
+            list.innerHTML = `
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>닉네임</th>
+                            <th>포인트</th>
+                            <th>질문권</th>
+                            <th>수강 강의</th>
+                            <th>가입일</th>
+                            <th>관리</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${regularUsers.map(user => `
+                            <tr>
+                                <td>${user.nickname}</td>
+                                <td>${(user.points || 0).toLocaleString()} P</td>
+                                <td>${user.secretQuestions || 0}개</td>
+                                <td>${(user.courses || []).length}개</td>
+                                <td>${new Date(user.createdAt).toLocaleDateString('ko-KR')}</td>
+                                <td>
+                                    <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 14px; margin-right: 5px; background: var(--warning);" onclick="suspendUser('${user.nickname}')">정지</button>
+                                    <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 14px; background: var(--danger);" onclick="blacklistUser('${user.nickname}')">블랙리스트</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function suspendUser(nickname) {
+            if (!confirm(`${nickname} 회원을 30일간 정지하시겠습니까?`)) return;
+            
+            let users = JSON.parse(localStorage.getItem('users') || '[]');
+            const userIndex = users.findIndex(u => u.nickname === nickname);
+            
+            const suspendUntil = new Date();
+            suspendUntil.setDate(suspendUntil.getDate() + 30);
+            
+            users[userIndex].suspended = true;
+            users[userIndex].suspendedUntil = suspendUntil.toISOString();
+            
+            localStorage.setItem('users', JSON.stringify(users));
+            
+            // Give all users 20000 points
+            users.forEach(u => {
+                if (u.role !== 'admin') {
+                    u.points = (u.points || 0) + 20000;
+                }
+            });
+            localStorage.setItem('users', JSON.stringify(users));
+            
+            alert(`${nickname} 회원이 정지되었습니다. 모든 회원이 20,000P를 받았습니다.`);
+            loadUsers();
+        }
+
+        function blacklistUser(nickname) {
+            if (!confirm(`${nickname} 회원을 블랙리스트에 등재하시겠습니까?`)) return;
+            
+            let users = JSON.parse(localStorage.getItem('users') || '[]');
+            const userIndex = users.findIndex(u => u.nickname === nickname);
+            
+            users[userIndex].blacklisted = true;
+            users[userIndex].blacklistedAt = new Date().toISOString();
+            
+            localStorage.setItem('users', JSON.stringify(users));
+            
+            alert(`${nickname} 회원이 블랙리스트에 등재되었습니다.`);
+            loadUsers();
+        }
+
+        function loadBlacklist() {
+            const users = JSON.parse(localStorage.getItem('users') || '[]');
+            const blacklisted = users.filter(u => u.blacklisted);
+            const list = document.getElementById('blacklistList');
+
+            if (blacklisted.length === 0) {
+                list.innerHTML = '<p style="color: var(--gray); padding: 20px;">블랙리스트가 비어있습니다.</p>';
+                return;
+            }
+
+            list.innerHTML = `
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>닉네임</th>
+                            <th>등재일</th>
+                            <th>관리</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${blacklisted.map(user => `
+                            <tr>
+                                <td>${user.nickname}</td>
+                                <td>${new Date(user.blacklistedAt).toLocaleDateString('ko-KR')}</td>
+                                <td>
+                                    <button class="btn btn-primary" style="padding: 6px 12px; font-size: 14px;" onclick="unblacklistUser('${user.nickname}')">해제</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function unblacklistUser(nickname) {
+            if (!confirm(`${nickname} 회원의 블랙리스트를 해제하시겠습니까?`)) return;
+            
+            let users = JSON.parse(localStorage.getItem('users') || '[]');
+            const userIndex = users.findIndex(u => u.nickname === nickname);
+            
+            users[userIndex].blacklisted = false;
+            delete users[userIndex].blacklistedAt;
+            
+            localStorage.setItem('users', JSON.stringify(users));
+            
+            alert(`${nickname} 회원의 블랙리스트가 해제되었습니다.`);
+            loadBlacklist();
+        }
+
+        function loadStats() {
+            const users = JSON.parse(localStorage.getItem('users') || '[]');
+            const courses = JSON.parse(localStorage.getItem('courses') || '[]');
+            const posts = JSON.parse(localStorage.getItem('posts') || '[]');
+            const revenues = JSON.parse(localStorage.getItem('revenues') || '[]');
+
+            const stats = document.getElementById('statsContainer');
+            stats.innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+                    <div style="background: var(--light-gray); padding: 20px; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 36px; font-weight: bold; color: var(--primary); margin-bottom: 5px;">${users.length - 1}</div>
+                        <div style="color: var(--gray);">총 회원 수</div>
+                    </div>
+                    <div style="background: var(--light-gray); padding: 20px; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 36px; font-weight: bold; color: var(--primary); margin-bottom: 5px;">${courses.length}</div>
+                        <div style="color: var(--gray);">총 강의 수</div>
+                    </div>
+                    <div style="background: var(--light-gray); padding: 20px; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 36px; font-weight: bold; color: var(--primary); margin-bottom: 5px;">${posts.length}</div>
+                        <div style="color: var(--gray);">총 게시글</div>
+                    </div>
+                    <div style="background: var(--light-gray); padding: 20px; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 36px; font-weight: bold; color: var(--primary); margin-bottom: 5px;">${revenues.length}</div>
+                        <div style="color: var(--gray);">수익 인증</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Initialize
+        loadCourses();
+    </script>
+</body>
+</html>
