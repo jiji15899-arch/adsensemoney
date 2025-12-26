@@ -1,0 +1,239 @@
+ <!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>로그인 - ga100</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .auth-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .auth-box {
+            background: var(--white);
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            max-width: 400px;
+            width: 100%;
+        }
+        .auth-logo {
+            text-align: center;
+            font-size: 36px;
+            font-weight: bold;
+            color: var(--primary);
+            margin-bottom: 30px;
+        }
+        .auth-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+        .auth-tab {
+            flex: 1;
+            padding: 12px;
+            background: var(--light-gray);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.2s;
+        }
+        .auth-tab.active {
+            background: var(--primary);
+            color: var(--white);
+        }
+        .auth-form {
+            display: none;
+        }
+        .auth-form.active {
+            display: block;
+        }
+        .submit-btn {
+            width: 100%;
+            padding: 14px;
+            background: var(--primary);
+            color: var(--white);
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .submit-btn:hover {
+            background: var(--primary-dark);
+        }
+        .back-link {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .back-link a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-box">
+            <div class="auth-logo">ga100</div>
+            
+            <div class="auth-tabs">
+                <button class="auth-tab active" onclick="switchTab('login')">로그인</button>
+                <button class="auth-tab" onclick="switchTab('signup')">회원가입</button>
+            </div>
+
+            <!-- Login Form -->
+            <form class="auth-form active" id="loginForm" onsubmit="handleLogin(event)">
+                <div id="loginAlert"></div>
+                <div class="form-group">
+                    <label>닉네임</label>
+                    <input type="text" id="loginNickname" required>
+                </div>
+                <div class="form-group">
+                    <label>비밀번호</label>
+                    <input type="password" id="loginPassword" required>
+                </div>
+                <button type="submit" class="submit-btn">로그인</button>
+            </form>
+
+            <!-- Signup Form -->
+            <form class="auth-form" id="signupForm" onsubmit="handleSignup(event)">
+                <div id="signupAlert"></div>
+                <div class="form-group">
+                    <label>닉네임</label>
+                    <input type="text" id="signupNickname" required>
+                </div>
+                <div class="form-group">
+                    <label>비밀번호</label>
+                    <input type="password" id="signupPassword" required>
+                </div>
+                <div class="form-group">
+                    <label>비밀번호 확인</label>
+                    <input type="password" id="signupPasswordConfirm" required>
+                </div>
+                <button type="submit" class="submit-btn">회원가입</button>
+            </form>
+
+            <div class="back-link">
+                <a href="index.html">← 메인으로 돌아가기</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize default admin account
+        function initDefaultAccounts() {
+            let users = JSON.parse(localStorage.getItem('users') || '[]');
+            const adminExists = users.some(u => u.nickname === 'ga100admin');
+            
+            if (!adminExists) {
+                const allCourses = JSON.parse(localStorage.getItem('courses') || '[]');
+                users.push({
+                    nickname: 'ga100admin',
+                    password: 'adminpower100',
+                    role: 'admin',
+                    points: 999999,
+                    courses: allCourses.map(c => c.id),
+                    secretQuestions: 999,
+                    createdAt: new Date().toISOString()
+                });
+                localStorage.setItem('users', JSON.stringify(users));
+            }
+        }
+
+        initDefaultAccounts();
+
+        function switchTab(tab) {
+            const tabs = document.querySelectorAll('.auth-tab');
+            const forms = document.querySelectorAll('.auth-form');
+            
+            tabs.forEach(t => t.classList.remove('active'));
+            forms.forEach(f => f.classList.remove('active'));
+            
+            if (tab === 'login') {
+                tabs[0].classList.add('active');
+                forms[0].classList.add('active');
+            } else {
+                tabs[1].classList.add('active');
+                forms[1].classList.add('active');
+            }
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const nickname = document.getElementById('loginNickname').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            const alertDiv = document.getElementById('loginAlert');
+
+            const users = JSON.parse(localStorage.getItem('users') || '[]');
+            const user = users.find(u => u.nickname === nickname && u.password === password);
+
+            if (user) {
+                // Check if account is suspended
+                if (user.suspended && new Date(user.suspendedUntil) > new Date()) {
+                    alertDiv.innerHTML = '<div class="alert alert-error">계정이 일시 정지되었습니다.</div>';
+                    return;
+                }
+
+                // Check blacklist
+                if (user.blacklisted) {
+                    alertDiv.innerHTML = '<div class="alert alert-error">블랙리스트에 등재된 계정입니다.</div>';
+                    return;
+                }
+
+                localStorage.setItem('currentUser', JSON.stringify(user));
+                window.location.href = user.role === 'admin' ? 'admin.html' : 'index.html';
+            } else {
+                alertDiv.innerHTML = '<div class="alert alert-error">닉네임 또는 비밀번호가 올바르지 않습니다.</div>';
+            }
+        }
+
+        function handleSignup(e) {
+            e.preventDefault();
+            const nickname = document.getElementById('signupNickname').value.trim();
+            const password = document.getElementById('signupPassword').value;
+            const passwordConfirm = document.getElementById('signupPasswordConfirm').value;
+            const alertDiv = document.getElementById('signupAlert');
+
+            if (password !== passwordConfirm) {
+                alertDiv.innerHTML = '<div class="alert alert-error">비밀번호가 일치하지 않습니다.</div>';
+                return;
+            }
+
+            let users = JSON.parse(localStorage.getItem('users') || '[]');
+            
+            // Check for existing nickname or password
+            const nicknameExists = users.some(u => u.nickname === nickname);
+            const passwordExists = users.some(u => u.password === password);
+
+            if (nicknameExists || passwordExists) {
+                alertDiv.innerHTML = '<div class="alert alert-error">이미 사용 중인 닉네임 또는 비밀번호입니다.</div>';
+                return;
+            }
+
+            // Create new user
+            const newUser = {
+                nickname,
+                password,
+                role: 'user',
+                points: 0,
+                courses: [],
+                secretQuestions: 0,
+                createdAt: new Date().toISOString()
+            };
+
+            users.push(newUser);
+            localStorage.setItem('users', JSON.stringify(users));
+            
+            alertDiv.innerHTML = '<div class="alert alert-success">회원가입이 완료되었습니다. 로그인해주세요.</div>';
+            setTimeout(() => switchTab('login'), 1500);
+        }
+    </script>
+</body>
+</html>
