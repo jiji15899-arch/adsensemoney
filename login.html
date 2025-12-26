@@ -27,6 +27,7 @@
             font-weight: bold;
             color: var(--primary);
             margin-bottom: 30px;
+            cursor: pointer;
         }
         .auth-tabs {
             display: flex;
@@ -81,7 +82,7 @@
 <body>
     <div class="auth-container">
         <div class="auth-box">
-            <div class="auth-logo">ga100</div>
+            <div class="auth-logo" onclick="window.location.href='index.html'">ga100</div>
             
             <div class="auth-tabs">
                 <button class="auth-tab active" onclick="switchTab('login')">로그인</button>
@@ -105,7 +106,7 @@
                 <div id="signupAlert"></div>
                 <div class="form-group">
                     <label>이메일</label>
-                    <input type="email" id="signupEmail" required placeholder="example@email.com">
+                    <input type="email" id="signupEmail" required>
                 </div>
                 <div class="form-group">
                     <label>닉네임</label>
@@ -117,7 +118,7 @@
                 </div>
                 <div class="form-group">
                     <label>비밀번호 확인</label>
-                    <input type="password" id="signupPasswordConfirm" required>
+                    <input type="password" id="signupPasswordConfirm" required minlength="6">
                 </div>
                 <button type="submit" class="submit-btn" id="signupBtn">회원가입</button>
             </form>
@@ -129,23 +130,11 @@
     </div>
 
     <script type="module">
-        import { auth, db } from './firebase-init.js';
-        import { 
-            createUserWithEmailAndPassword, 
-            signInWithEmailAndPassword,
-            onAuthStateChanged 
-        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { 
-            doc, 
-            setDoc, 
-            getDoc,
-            collection,
-            query,
-            where,
-            getDocs
-        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { auth, db } from './firebase-config.js';
+        import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { doc, setDoc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        // 탭 전환 로직
+        // 전역 함수로 노출 (HTML onclick용)
         window.switchTab = function(tab) {
             const tabs = document.querySelectorAll('.auth-tab');
             const forms = document.querySelectorAll('.auth-form');
@@ -165,7 +154,7 @@
         // 로그인 처리
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const email = document.getElementById('loginEmail').value;
+            const email = document.getElementById('loginEmail').value.trim();
             const password = document.getElementById('loginPassword').value;
             const alertDiv = document.getElementById('loginAlert');
             const btn = document.getElementById('loginBtn');
@@ -175,38 +164,50 @@
                 btn.textContent = '로그인 중...';
 
                 const userCredential = await signInWithEmailAndPassword(auth, email, password);
-                const uid = userCredential.user.uid;
+                const user = userCredential.user;
 
-                // Firestore에서 유저 정보 가져오기
-                const userDoc = await getDoc(doc(db, "users", uid));
-                
-                if (userDoc.exists()) {
-                    const userData = userDoc.data();
+                // Firestore에서 사용자 정보 가져오기
+                const userDocRef = doc(db, "users", user.uid);
+                const userSnap = await getDoc(userDocRef);
 
-                    // 정지 여부 확인
-                    if (userData.suspended && new Date(userData.suspendedUntil) > new Date()) {
-                        throw new Error(`계정이 정지되었습니다. 해제일: ${new Date(userData.suspendedUntil).toLocaleDateString()}`);
-                    }
-                    
-                    // 블랙리스트 확인
-                    if (userData.blacklisted) {
-                        throw new Error("블랙리스트에 등록된 계정입니다. 관리자에게 문의하세요.");
-                    }
+                if (!userSnap.exists()) {
+                    // 문서가 없으면 생성 (Admin 계정 복구용 등)
+                    await createInitialUserDoc(user, "User");
+                } 
 
-                    // 관리자 여부에 따라 이동
-                    if (userData.role === 'admin') {
-                        window.location.href = 'admin.html';
-                    } else {
-                        window.location.href = 'index.html';
-                    }
-                } else {
-                    throw new Error("회원 정보를 찾을 수 없습니다.");
+                const userData = userSnap.exists() ? userSnap.data() : { role: 'user', blacklisted: false };
+
+                // 블랙리스트 체크
+                if (userData.blacklisted) {
+                    await auth.signOut();
+                    alertDiv.innerHTML = '<div class="alert alert-error">블랙리스트에 등재된 계정입니다. 관리자에게 문의하세요.</div>';
+                    btn.disabled = false;
+                    btn.textContent = '로그인';
+                    return;
                 }
+
+                // 정지 체크
+                if (userData.suspendedUntil && new Date(userData.suspendedUntil) > new Date()) {
+                    await auth.signOut();
+                    alertDiv.innerHTML = `<div class="alert alert-error">계정이 ${new Date(userData.suspendedUntil).toLocaleDateString()}까지 정지되었습니다.</div>`;
+                    btn.disabled = false;
+                    btn.textContent = '로그인';
+                    return;
+                }
+
+                // 관리자 이메일 하드코딩 체크 및 권한 부여
+                if (email === 'fli501824@gmail.com' && userData.role !== 'admin') {
+                    await updateDoc(userDocRef, { role: 'admin' });
+                    userData.role = 'admin';
+                }
+
+                // 이동
+                window.location.href = userData.role === 'admin' ? 'admin.html' : 'index.html';
 
             } catch (error) {
                 console.error(error);
-                let msg = "로그인 실패: " + error.message;
-                if (error.code === 'auth/invalid-credential') msg = "이메일 또는 비밀번호가 잘못되었습니다.";
+                let msg = '로그인 실패: 이메일 또는 비밀번호를 확인하세요.';
+                if(error.code === 'auth/invalid-credential') msg = '잘못된 이메일이나 비밀번호입니다.';
                 alertDiv.innerHTML = `<div class="alert alert-error">${msg}</div>`;
                 btn.disabled = false;
                 btn.textContent = '로그인';
@@ -216,65 +217,58 @@
         // 회원가입 처리
         document.getElementById('signupForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const email = document.getElementById('signupEmail').value;
+            const email = document.getElementById('signupEmail').value.trim();
             const nickname = document.getElementById('signupNickname').value.trim();
             const password = document.getElementById('signupPassword').value;
-            const passwordConfirm = document.getElementById('signupPasswordConfirm').value;
+            const confirm = document.getElementById('signupPasswordConfirm').value;
             const alertDiv = document.getElementById('signupAlert');
             const btn = document.getElementById('signupBtn');
 
-            if (password !== passwordConfirm) {
+            if (password !== confirm) {
                 alertDiv.innerHTML = '<div class="alert alert-error">비밀번호가 일치하지 않습니다.</div>';
                 return;
             }
 
             try {
                 btn.disabled = true;
-                btn.textContent = '가입 처리 중...';
+                btn.textContent = '처리 중...';
 
-                // 닉네임 중복 확인
-                const q = query(collection(db, "users"), where("nickname", "==", nickname));
-                const querySnapshot = await getDocs(q);
-                if (!querySnapshot.empty) {
-                    throw new Error("이미 사용 중인 닉네임입니다.");
-                }
-
-                // Firebase Auth 가입
+                // Firebase Auth 생성
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                 const user = userCredential.user;
 
-                // 최초 관리자 설정 (특정 이메일이거나, DB에 유저가 없을 경우)
-                // 여기서는 ga100admin@gmail.com을 관리자로 지정하는 예시
-                const role = email === 'jiji15899@gmail.com' ? 'admin' : 'user';
+                // Firestore에 유저 정보 저장
+                await createInitialUserDoc(user, nickname);
 
-                // Firestore에 유저 데이터 저장
-                await setDoc(doc(db, "users", user.uid), {
-                    uid: user.uid,
-                    email: email,
-                    nickname: nickname,
-                    role: role,
-                    points: role === 'admin' ? 999999 : 0,
-                    courses: [],
-                    secretQuestions: role === 'admin' ? 999 : 0,
-                    suspended: false,
-                    blacklisted: false,
-                    createdAt: new Date().toISOString()
-                });
-
-                alert("회원가입이 완료되었습니다.");
-                window.location.href = 'index.html';
+                alertDiv.innerHTML = '<div class="alert alert-success">회원가입 완료! 자동으로 로그인됩니다.</div>';
+                setTimeout(() => window.location.href = 'index.html', 1500);
 
             } catch (error) {
                 console.error(error);
-                let msg = error.message;
-                if (error.code === 'auth/email-already-in-use') msg = "이미 가입된 이메일입니다.";
-                if (error.code === 'auth/weak-password') msg = "비밀번호는 6자리 이상이어야 합니다.";
-                
+                let msg = '회원가입 실패';
+                if(error.code === 'auth/email-already-in-use') msg = '이미 사용 중인 이메일입니다.';
+                if(error.code === 'auth/weak-password') msg = '비밀번호는 6자리 이상이어야 합니다.';
                 alertDiv.innerHTML = `<div class="alert alert-error">${msg}</div>`;
                 btn.disabled = false;
                 btn.textContent = '회원가입';
             }
         });
+
+        async function createInitialUserDoc(user, nickname) {
+            const isAdmin = user.email === 'fli501824@gmail.com';
+            
+            await setDoc(doc(db, "users", user.uid), {
+                email: user.email,
+                nickname: nickname,
+                role: isAdmin ? 'admin' : 'user',
+                points: isAdmin ? 999999 : 0,
+                secretQuestions: isAdmin ? 999 : 0,
+                courses: [],
+                createdAt: new Date().toISOString(),
+                blacklisted: false,
+                suspended: false
+            });
+        }
     </script>
 </body>
 </html>
