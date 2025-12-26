@@ -36,12 +36,10 @@
             <div class="admin-tabs">
                 <button class="admin-tab active" onclick="switchAdminTab('courses')">강의 관리</button>
                 <button class="admin-tab" onclick="switchAdminTab('users')">회원 관리</button>
-                <button class="admin-tab" onclick="switchAdminTab('blacklist')">블랙리스트</button>
-                <button class="admin-tab" onclick="switchAdminTab('payments')">결제 승인</button>
+                <button class="admin-tab" onclick="switchAdminTab('payments')">결제 승인 관리</button>
                 <button class="admin-tab" onclick="switchAdminTab('stats')">통계</button>
             </div>
 
-            <!-- Course Management -->
             <div class="admin-content active" id="courses-content">
                 <div class="admin-panel">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
@@ -52,7 +50,6 @@
                 </div>
             </div>
 
-            <!-- User Management -->
             <div class="admin-content" id="users-content">
                 <div class="admin-panel">
                     <h3 style="margin-bottom: 20px;">회원 목록</h3>
@@ -60,23 +57,16 @@
                 </div>
             </div>
 
-            <!-- Blacklist -->
-            <div class="admin-content" id="blacklist-content">
-                <div class="admin-panel">
-                    <h3 style="margin-bottom: 20px;">블랙리스트</h3>
-                    <div id="blacklistList"></div>
-                </div>
-            </div>
-
-            <!-- Payments -->
             <div class="admin-content" id="payments-content">
                 <div class="admin-panel">
-                    <h3 style="margin-bottom: 20px;">결제 승인 대기</h3>
-                    <p style="color: var(--gray);">결제 승인 기능은 실제 백엔드 시스템이 필요합니다.</p>
+                    <h3 style="margin-bottom: 20px;">결제 승인 대기 목록</h3>
+                    <div class="alert alert-info">
+                        사용자가 송금 후 '확인 요청'을 보낸 내역입니다. 입금이 확인되면 [승인]을 눌러주세요.
+                    </div>
+                    <div id="paymentRequestsList"></div>
                 </div>
             </div>
 
-            <!-- Statistics -->
             <div class="admin-content" id="stats-content">
                 <div class="admin-panel">
                     <h3 style="margin-bottom: 20px;">통계</h3>
@@ -86,7 +76,6 @@
         </div>
     </main>
 
-    <!-- Course Form Modal -->
     <div class="modal" id="courseModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -120,7 +109,18 @@
                     <input type="text" id="courseImage" placeholder="📖" maxlength="2">
                 </div>
                 <div class="form-group">
-                    <label>강의 내용</label>
+                    <label>다운로드 링크 (구글 드라이브/PDF URL)</label>
+                    <input type="url" id="courseDownloadUrl" placeholder="https://..." required>
+                    <small style="color:var(--gray)">결제 완료된 사용자에게만 보이는 버튼의 링크입니다.</small>
+                </div>
+                <div class="form-group">
+                    <label>결제/송금 안내 (은행 계좌 또는 토스 링크)</label>
+                    <input type="text" id="coursePaymentInfo" placeholder="예: 카카오뱅크 3333-xx-xxxx 홍길동" required>
+                    <small style="color:var(--gray)">사용자가 구매 버튼을 눌렀을 때 보여질 문구입니다.</small>
+                </div>
+                
+                <div class="form-group">
+                    <label>강의 상세 내용 (HTML 지원)</label>
                     <textarea id="courseContent" required style="min-height: 200px;"></textarea>
                 </div>
                 <input type="hidden" id="courseId">
@@ -161,7 +161,7 @@
             
             if (tab === 'courses') loadCourses();
             if (tab === 'users') loadUsers();
-            if (tab === 'blacklist') loadBlacklist();
+            if (tab === 'payments') loadPaymentRequests();
             if (tab === 'stats') loadStats();
         }
 
@@ -179,7 +179,6 @@
                     <thead>
                         <tr>
                             <th>제목</th>
-                            <th>카테고리</th>
                             <th>가격</th>
                             <th>등록일</th>
                             <th>관리</th>
@@ -189,7 +188,6 @@
                         ${courses.map(course => `
                             <tr>
                                 <td>${course.image} ${course.title}</td>
-                                <td><span class="badge badge-success">${course.category}</span></td>
                                 <td>${course.price === 0 ? '무료' : course.price.toLocaleString() + '원'}</td>
                                 <td>${new Date(course.createdAt).toLocaleDateString('ko-KR')}</td>
                                 <td>
@@ -203,6 +201,105 @@
             `;
         }
 
+        // --- Payment Request Logic (New) ---
+        function loadPaymentRequests() {
+            const requests = JSON.parse(localStorage.getItem('paymentRequests') || '[]');
+            const users = JSON.parse(localStorage.getItem('users') || '[]');
+            const courses = JSON.parse(localStorage.getItem('courses') || '[]');
+            
+            const list = document.getElementById('paymentRequestsList');
+
+            if (requests.length === 0) {
+                list.innerHTML = '<p style="color: var(--gray); padding: 20px;">대기 중인 결제 승인 요청이 없습니다.</p>';
+                return;
+            }
+
+            list.innerHTML = `
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>신청자</th>
+                            <th>강의명</th>
+                            <th>입금자명</th>
+                            <th>신청일시</th>
+                            <th>관리</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${requests.map(req => {
+                            const course = courses.find(c => c.id === req.courseId);
+                            const courseTitle = course ? course.title : '삭제된 강의';
+                            return `
+                                <tr>
+                                    <td>${req.nickname}</td>
+                                    <td>${courseTitle}</td>
+                                    <td><strong>${req.depositor}</strong></td>
+                                    <td>${new Date(req.createdAt).toLocaleString('ko-KR')}</td>
+                                    <td>
+                                        <button class="btn btn-primary" style="padding: 6px 12px; background: var(--success);" onclick="approvePayment(${req.id})">승인</button>
+                                        <button class="btn btn-secondary" style="padding: 6px 12px; background: var(--danger);" onclick="rejectPayment(${req.id})">거절</button>
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function approvePayment(requestId) {
+            const requests = JSON.parse(localStorage.getItem('paymentRequests') || '[]');
+            const reqIndex = requests.findIndex(r => r.id === requestId);
+            
+            if (reqIndex === -1) return;
+            const req = requests[reqIndex];
+
+            if(!confirm(`'${req.depositor}'님의 입금이 확인되었습니까? 승인하시겠습니까?`)) return;
+
+            // 1. Add course to user
+            let users = JSON.parse(localStorage.getItem('users') || '[]');
+            const userIndex = users.findIndex(u => u.nickname === req.nickname);
+            
+            if (userIndex !== -1 && !users[userIndex].courses.includes(req.courseId)) {
+                users[userIndex].courses.push(req.courseId);
+                
+                // Add points (Bonus logic)
+                users[userIndex].points = (users[userIndex].points || 0) + 1000;
+                
+                localStorage.setItem('users', JSON.stringify(users));
+            }
+
+            // 2. Remove request
+            requests.splice(reqIndex, 1);
+            localStorage.setItem('paymentRequests', JSON.stringify(requests));
+
+            // 3. Create notification (Optional but good)
+            let notifications = JSON.parse(localStorage.getItem('notifications') || '[]');
+            notifications.unshift({
+                id: Date.now(),
+                message: `[승인 완료] 신청하신 강의 수강이 승인되었습니다.`,
+                link: `course-detail.html?id=${req.courseId}`,
+                read: false,
+                time: new Date().toISOString()
+            });
+            localStorage.setItem('notifications', JSON.stringify(notifications));
+
+            alert('승인되었습니다. 사용자는 이제 다운로드 버튼을 볼 수 있습니다.');
+            loadPaymentRequests();
+        }
+
+        function rejectPayment(requestId) {
+            if(!confirm('정말 거절하시겠습니까? 요청 내역이 삭제됩니다.')) return;
+            
+            let requests = JSON.parse(localStorage.getItem('paymentRequests') || '[]');
+            requests = requests.filter(r => r.id !== requestId);
+            localStorage.setItem('paymentRequests', JSON.stringify(requests));
+            
+            alert('거절되었습니다.');
+            loadPaymentRequests();
+        }
+
+        // --- Course Form Logic ---
         function showCourseForm(courseId = null) {
             const modal = document.getElementById('courseModal');
             const title = document.getElementById('courseModalTitle');
@@ -220,6 +317,8 @@
                     document.getElementById('courseCategory').value = course.category;
                     document.getElementById('courseImage').value = course.image;
                     document.getElementById('courseContent').value = course.content;
+                    document.getElementById('courseDownloadUrl').value = course.downloadUrl || '';
+                    document.getElementById('coursePaymentInfo').value = course.paymentInfo || '';
                 }
             } else {
                 title.textContent = '강의 추가';
@@ -230,6 +329,8 @@
                 document.getElementById('courseCategory').value = '승인';
                 document.getElementById('courseImage').value = '📖';
                 document.getElementById('courseContent').value = '';
+                document.getElementById('courseDownloadUrl').value = '';
+                document.getElementById('coursePaymentInfo').value = '';
             }
             
             modal.classList.add('active');
@@ -255,15 +356,15 @@
                 price: parseInt(document.getElementById('coursePrice').value),
                 category: document.getElementById('courseCategory').value,
                 image: document.getElementById('courseImage').value.trim() || '📖',
-                content: document.getElementById('courseContent').value.trim()
+                content: document.getElementById('courseContent').value.trim(),
+                downloadUrl: document.getElementById('courseDownloadUrl').value.trim(),
+                paymentInfo: document.getElementById('coursePaymentInfo').value.trim()
             };
 
             if (courseId) {
-                // Update existing course
                 const index = courses.findIndex(c => c.id === parseInt(courseId));
                 courses[index] = { ...courses[index], ...courseData };
             } else {
-                // Add new course
                 courses.push({
                     id: Date.now(),
                     ...courseData,
@@ -272,15 +373,6 @@
             }
 
             localStorage.setItem('courses', JSON.stringify(courses));
-            
-            // Update admin's courses
-            let users = JSON.parse(localStorage.getItem('users') || '[]');
-            const adminIndex = users.findIndex(u => u.role === 'admin');
-            if (adminIndex >= 0) {
-                users[adminIndex].courses = courses.map(c => c.id);
-                localStorage.setItem('users', JSON.stringify(users));
-            }
-
             alert('강의가 저장되었습니다!');
             closeCourseModal();
             loadCourses();
@@ -288,35 +380,30 @@
 
         function deleteCourse(id) {
             if (!confirm('정말 이 강의를 삭제하시겠습니까?')) return;
-            
             let courses = JSON.parse(localStorage.getItem('courses') || '[]');
             courses = courses.filter(c => c.id !== id);
             localStorage.setItem('courses', JSON.stringify(courses));
-            
             alert('강의가 삭제되었습니다.');
             loadCourses();
         }
 
         function loadUsers() {
+            // Existing logic remains same...
             const users = JSON.parse(localStorage.getItem('users') || '[]');
             const regularUsers = users.filter(u => u.role !== 'admin');
             const list = document.getElementById('usersList');
-
             if (regularUsers.length === 0) {
                 list.innerHTML = '<p style="color: var(--gray); padding: 20px;">회원이 없습니다.</p>';
                 return;
             }
-
             list.innerHTML = `
                 <table class="table">
                     <thead>
                         <tr>
                             <th>닉네임</th>
                             <th>포인트</th>
-                            <th>질문권</th>
                             <th>수강 강의</th>
                             <th>가입일</th>
-                            <th>관리</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -324,140 +411,40 @@
                             <tr>
                                 <td>${user.nickname}</td>
                                 <td>${(user.points || 0).toLocaleString()} P</td>
-                                <td>${user.secretQuestions || 0}개</td>
                                 <td>${(user.courses || []).length}개</td>
                                 <td>${new Date(user.createdAt).toLocaleDateString('ko-KR')}</td>
-                                <td>
-                                    <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 14px; margin-right: 5px; background: var(--warning);" onclick="suspendUser('${user.nickname}')">정지</button>
-                                    <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 14px; background: var(--danger);" onclick="blacklistUser('${user.nickname}')">블랙리스트</button>
-                                </td>
                             </tr>
                         `).join('')}
                     </tbody>
                 </table>
             `;
-        }
-
-        function suspendUser(nickname) {
-            if (!confirm(`${nickname} 회원을 30일간 정지하시겠습니까?`)) return;
-            
-            let users = JSON.parse(localStorage.getItem('users') || '[]');
-            const userIndex = users.findIndex(u => u.nickname === nickname);
-            
-            const suspendUntil = new Date();
-            suspendUntil.setDate(suspendUntil.getDate() + 30);
-            
-            users[userIndex].suspended = true;
-            users[userIndex].suspendedUntil = suspendUntil.toISOString();
-            
-            localStorage.setItem('users', JSON.stringify(users));
-            
-            // Give all users 20000 points
-            users.forEach(u => {
-                if (u.role !== 'admin') {
-                    u.points = (u.points || 0) + 20000;
-                }
-            });
-            localStorage.setItem('users', JSON.stringify(users));
-            
-            alert(`${nickname} 회원이 정지되었습니다. 모든 회원이 20,000P를 받았습니다.`);
-            loadUsers();
-        }
-
-        function blacklistUser(nickname) {
-            if (!confirm(`${nickname} 회원을 블랙리스트에 등재하시겠습니까?`)) return;
-            
-            let users = JSON.parse(localStorage.getItem('users') || '[]');
-            const userIndex = users.findIndex(u => u.nickname === nickname);
-            
-            users[userIndex].blacklisted = true;
-            users[userIndex].blacklistedAt = new Date().toISOString();
-            
-            localStorage.setItem('users', JSON.stringify(users));
-            
-            alert(`${nickname} 회원이 블랙리스트에 등재되었습니다.`);
-            loadUsers();
-        }
-
-        function loadBlacklist() {
-            const users = JSON.parse(localStorage.getItem('users') || '[]');
-            const blacklisted = users.filter(u => u.blacklisted);
-            const list = document.getElementById('blacklistList');
-
-            if (blacklisted.length === 0) {
-                list.innerHTML = '<p style="color: var(--gray); padding: 20px;">블랙리스트가 비어있습니다.</p>';
-                return;
-            }
-
-            list.innerHTML = `
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>닉네임</th>
-                            <th>등재일</th>
-                            <th>관리</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${blacklisted.map(user => `
-                            <tr>
-                                <td>${user.nickname}</td>
-                                <td>${new Date(user.blacklistedAt).toLocaleDateString('ko-KR')}</td>
-                                <td>
-                                    <button class="btn btn-primary" style="padding: 6px 12px; font-size: 14px;" onclick="unblacklistUser('${user.nickname}')">해제</button>
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            `;
-        }
-
-        function unblacklistUser(nickname) {
-            if (!confirm(`${nickname} 회원의 블랙리스트를 해제하시겠습니까?`)) return;
-            
-            let users = JSON.parse(localStorage.getItem('users') || '[]');
-            const userIndex = users.findIndex(u => u.nickname === nickname);
-            
-            users[userIndex].blacklisted = false;
-            delete users[userIndex].blacklistedAt;
-            
-            localStorage.setItem('users', JSON.stringify(users));
-            
-            alert(`${nickname} 회원의 블랙리스트가 해제되었습니다.`);
-            loadBlacklist();
         }
 
         function loadStats() {
+            // Existing logic...
             const users = JSON.parse(localStorage.getItem('users') || '[]');
             const courses = JSON.parse(localStorage.getItem('courses') || '[]');
-            const posts = JSON.parse(localStorage.getItem('posts') || '[]');
-            const revenues = JSON.parse(localStorage.getItem('revenues') || '[]');
-
+            const requests = JSON.parse(localStorage.getItem('paymentRequests') || '[]');
+            
             const stats = document.getElementById('statsContainer');
             stats.innerHTML = `
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
                     <div style="background: var(--light-gray); padding: 20px; border-radius: 8px; text-align: center;">
-                        <div style="font-size: 36px; font-weight: bold; color: var(--primary); margin-bottom: 5px;">${users.length - 1}</div>
-                        <div style="color: var(--gray);">총 회원 수</div>
+                        <div style="font-size: 36px; font-weight: bold; color: var(--primary); margin-bottom: 5px;">${users.length}</div>
+                        <div style="color: var(--gray);">총 회원</div>
                     </div>
                     <div style="background: var(--light-gray); padding: 20px; border-radius: 8px; text-align: center;">
                         <div style="font-size: 36px; font-weight: bold; color: var(--primary); margin-bottom: 5px;">${courses.length}</div>
-                        <div style="color: var(--gray);">총 강의 수</div>
+                        <div style="color: var(--gray);">총 강의</div>
                     </div>
                     <div style="background: var(--light-gray); padding: 20px; border-radius: 8px; text-align: center;">
-                        <div style="font-size: 36px; font-weight: bold; color: var(--primary); margin-bottom: 5px;">${posts.length}</div>
-                        <div style="color: var(--gray);">총 게시글</div>
-                    </div>
-                    <div style="background: var(--light-gray); padding: 20px; border-radius: 8px; text-align: center;">
-                        <div style="font-size: 36px; font-weight: bold; color: var(--primary); margin-bottom: 5px;">${revenues.length}</div>
-                        <div style="color: var(--gray);">수익 인증</div>
+                        <div style="font-size: 36px; font-weight: bold; color: var(--warning); margin-bottom: 5px;">${requests.length}</div>
+                        <div style="color: var(--gray);">승인 대기</div>
                     </div>
                 </div>
             `;
         }
 
-        // Initialize
         loadCourses();
     </script>
 </body>
