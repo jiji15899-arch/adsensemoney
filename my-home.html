@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>마이홈 - ga100</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <h1 class="logo" onclick="window.location.href='index.html'" style="cursor:pointer">ga100</h1>
+                <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+            </div>
+        </div>
+    </header>
+
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h2>ga100</h2>
+            <button class="close-sidebar" onclick="toggleSidebar()">✕</button>
+        </div>
+        <div class="sidebar-section">
+            <button class="auth-btn" onclick="logout()">로그아웃</button>
+        </div>
+        <div class="sidebar-section">
+            <h3>강의</h3>
+            <ul>
+                <li><a href="courses.html">모든 강의 보기</a></li>
+            </ul>
+        </div>
+        <div class="sidebar-section">
+            <h3>커뮤니티</h3>
+            <ul>
+                <li><a href="community.html">커뮤니티</a></li>
+            </ul>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <div class="container">
+            <h2 style="margin-bottom: 30px;">마이홈</h2>
+            
+            <div class="admin-tabs">
+                <button class="admin-tab active" onclick="switchMyTab('my-courses')">내 클래스</button>
+                <button class="admin-tab" onclick="switchMyTab('my-revenue')">내 수익 현황</button>
+                <button class="admin-tab" onclick="switchMyTab('secret-questions')">시크릿 질문</button>
+                <button class="admin-tab" onclick="switchMyTab('edit-profile')">내 정보 수정</button>
+            </div>
+
+            <!-- My Courses -->
+            <div class="admin-content active" id="my-courses">
+                <div class="admin-panel">
+                    <h3>수강 중인 강의</h3>
+                    <div id="myCoursesList"></div>
+                </div>
+            </div>
+
+            <!-- My Revenue -->
+            <div class="admin-content" id="my-revenue">
+                <div class="admin-panel">
+                    <h3>포인트 현황</h3>
+                    <div style="background: var(--light-gray); padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                        <div style="font-size: 14px; color: var(--gray); margin-bottom: 5px;">보유 포인트</div>
+                        <div style="font-size: 32px; font-weight: bold; color: var(--primary);" id="myPoints">0 P</div>
+                    </div>
+                    <div class="alert alert-info">
+                        포인트는 강의 가격의 40%에 해당하는 금액으로 5일간 강의를 수강할 수 있습니다.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Secret Questions -->
+            <div class="admin-content" id="secret-questions">
+                <div class="admin-panel">
+                    <h3>시크릿 질문권</h3>
+                    <div style="background: var(--light-gray); padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                        <div style="font-size: 14px; color: var(--gray); margin-bottom: 5px;">보유 질문권</div>
+                        <div style="font-size: 32px; font-weight: bold; color: var(--primary);" id="questionCount">0개</div>
+                    </div>
+                    <div class="alert alert-info">
+                        <strong>질문권 획득 방법:</strong><br>
+                        • 강의 후기 작성: 1회<br>
+                        • 커뮤니티 게시글 작성: 2회<br>
+                        • 게시글 댓글 작성: 1회
+                    </div>
+                    <a href="community.html?tab=secret" class="btn btn-primary" style="margin-top: 15px;">시크릿 질문하기</a>
+                </div>
+            </div>
+
+            <!-- Edit Profile -->
+            <div class="admin-content" id="edit-profile">
+                <div class="admin-panel">
+                    <h3>내 정보 수정</h3>
+                    <form onsubmit="handleProfileUpdate(event)">
+                        <div id="profileAlert"></div>
+                        <div class="form-group">
+                            <label>현재 닉네임</label>
+                            <input type="text" id="currentNickname" disabled>
+                        </div>
+                        <div class="form-group">
+                            <label>새 닉네임</label>
+                            <input type="text" id="newNickname">
+                        </div>
+                        <div class="form-group">
+                            <label>새 비밀번호</label>
+                            <input type="password" id="newPassword">
+                        </div>
+                        <div class="form-group">
+                            <label>새 비밀번호 확인</label>
+                            <input type="password" id="newPasswordConfirm">
+                        </div>
+                        <button type="submit" class="btn btn-primary">정보 수정</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-links">
+                <a href="my-home.html">마이홈</a>
+                <a href="revenue.html">수익인증</a>
+                <a href="courses.html">전자책</a>
+                <a href="community.html">커뮤니티</a>
+            </div>
+            <p class="copyright">© 2024 ga100. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+        let currentUser = JSON.parse(localStorage.getItem('currentUser'));
+
+        if (!currentUser) {
+            window.location.href = 'login.html';
+        }
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('active');
+        }
+
+        function logout() {
+            localStorage.removeItem('currentUser');
+            window.location.href = 'index.html';
+        }
+
+        function switchMyTab(tab) {
+            document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.admin-content').forEach(c => c.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(tab).classList.add('active');
+        }
+
+        function loadMyCourses() {
+            const courses = JSON.parse(localStorage.getItem('courses') || '[]');
+            const myCourses = courses.filter(c => currentUser.courses.includes(c.id));
+            const container = document.getElementById('myCoursesList');
+
+            if (myCourses.length === 0) {
+                container.innerHTML = '<p style="color: var(--gray); padding: 20px;">수강 중인 강의가 없습니다.</p>';
+                return;
+            }
+
+            container.innerHTML = `
+                <div class="course-grid">
+                    ${myCourses.map(course => `
+                        <div class="course-card" onclick="window.location.href='course-detail.html?id=${course.id}'">
+                            <div class="course-image">${course.image}</div>
+                            <div class="course-content">
+                                <h3>${course.title}</h3>
+                                <p>${course.description}</p>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function loadMyPoints() {
+            document.getElementById('myPoints').textContent = (currentUser.points || 0).toLocaleString() + ' P';
+        }
+
+        function loadQuestionCount() {
+            document.getElementById('questionCount').textContent = (currentUser.secretQuestions || 0) + '개';
+        }
+
+        function loadProfileForm() {
+            document.getElementById('currentNickname').value = currentUser.nickname;
+        }
+
+        function handleProfileUpdate(e) {
+            e.preventDefault();
+            const newNickname = document.getElementById('newNickname').value.trim();
+            const newPassword = document.getElementById('newPassword').value;
+            const newPasswordConfirm = document.getElementById('newPasswordConfirm').value;
+            const alertDiv = document.getElementById('profileAlert');
+
+            if (newPassword && newPassword !== newPasswordConfirm) {
+                alertDiv.innerHTML = '<div class="alert alert-error">비밀번호가 일치하지 않습니다.</div>';
+                return;
+            }
+
+            let users = JSON.parse(localStorage.getItem('users') || '[]');
+            
+            // Check for duplicates (excluding current user)
+            if (newNickname && newNickname !== currentUser.nickname) {
+                const nicknameExists = users.some(u => u.nickname === newNickname);
+                if (nicknameExists) {
+                    alertDiv.innerHTML = '<div class="alert alert-error">이미 사용 중인 닉네임입니다.</div>';
+                    return;
+                }
+            }
+
+            if (newPassword) {
+                const passwordExists = users.some(u => u.password === newPassword && u.nickname !== currentUser.nickname);
+                if (passwordExists) {
+                    alertDiv.innerHTML = '<div class="alert alert-error">이미 사용 중인 비밀번호입니다.</div>';
+                    return;
+                }
+            }
+
+            // Update user
+            const userIndex = users.findIndex(u => u.nickname === currentUser.nickname);
+            if (newNickname) users[userIndex].nickname = newNickname;
+            if (newPassword) users[userIndex].password = newPassword;
+
+            localStorage.setItem('users', JSON.stringify(users));
+            localStorage.setItem('currentUser', JSON.stringify(users[userIndex]));
+            currentUser = users[userIndex];
+
+            alertDiv.innerHTML = '<div class="alert alert-success">정보가 수정되었습니다.</div>';
+            setTimeout(() => window.location.reload(), 1500);
+        }
+
+        // Initialize
+        loadMyCourses();
+        loadMyPoints();
+        loadQuestionCount();
+        loadProfileForm();
+    </script>
+</body>
+</html>
