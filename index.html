@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ga100 - 애드센스 수익화 전문 플랫폼</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <h1 class="logo">ga100</h1>
+                <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+                <div class="header-right">
+                    <button class="notification-btn" onclick="toggleNotifications()">
+                        🔔
+                        <span class="notification-badge" id="notificationBadge"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Notifications Dropdown -->
+    <div class="notifications-dropdown" id="notificationsDropdown">
+        <h3>알림</h3>
+        <div id="notificationsList">
+            <p class="no-notifications">새로운 알림이 없습니다</p>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h2>ga100</h2>
+            <button class="close-sidebar" onclick="toggleSidebar()">✕</button>
+        </div>
+        
+        <div class="sidebar-section">
+            <button class="auth-btn" id="authBtn" onclick="handleAuth()">로그인</button>
+        </div>
+
+        <div class="sidebar-section">
+            <h3>강의</h3>
+            <ul>
+                <li><a href="courses.html?type=all">올인원 전자책</a></li>
+                <li><a href="courses.html?type=extend">수강 기간 연장하기</a></li>
+                <li><a href="courses.html">모든 강의 보기</a></li>
+            </ul>
+        </div>
+
+        <div class="sidebar-section">
+            <h3>커뮤니티</h3>
+            <ul>
+                <li><a href="community.html?tab=notice">공지</a></li>
+                <li><a href="community.html?tab=secret">시크릿 1:1 질문</a></li>
+                <li><a href="community.html?tab=community">제자 커뮤니티</a></li>
+            </ul>
+        </div>
+
+        <div class="sidebar-section">
+            <h3>프로그램</h3>
+            <ul>
+                <li><a href="#ai-writing">AI 글쓰기</a></li>
+            </ul>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <!-- Hero Section -->
+            <section class="hero">
+                <h2>애드센스 수익화의 모든 것</h2>
+                <p>애드센스 승인부터 수익 창출까지, 체계적인 강의로 여러분을 안내합니다</p>
+                <div class="hero-buttons">
+                    <a href="courses.html" class="btn btn-primary">강의 둘러보기</a>
+                    <a href="revenue.html" class="btn btn-secondary">수익 인증 보기</a>
+                </div>
+            </section>
+
+            <!-- Features -->
+            <section class="features">
+                <div class="feature-card">
+                    <div class="feature-icon">📚</div>
+                    <h3>전문 강의</h3>
+                    <p>애드센스 승인부터 수익화까지 단계별 전자책</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">💰</div>
+                    <h3>실제 수익 인증</h3>
+                    <p>수강생들의 실제 수익 사례와 노하우 공유</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">👥</div>
+                    <h3>커뮤니티</h3>
+                    <p>제자들과 함께 성장하는 학습 커뮤니티</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🤖</div>
+                    <h3>AI 글쓰기</h3>
+                    <p>효율적인 콘텐츠 제작을 위한 AI 도구</p>
+                </div>
+            </section>
+
+            <!-- Popular Courses -->
+            <section class="popular-courses">
+                <h2>인기 강의</h2>
+                <div class="course-grid" id="popularCourses">
+                    <!-- Courses will be loaded dynamically -->
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-links">
+                <a href="my-home.html">마이홈</a>
+                <a href="revenue.html">수익인증</a>
+                <a href="courses.html">전자책</a>
+                <a href="community.html">커뮤니티</a>
+            </div>
+            <p class="copyright">© 2024 ga100. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+    <script>
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', () => {
+            initAuth();
+            loadPopularCourses();
+            checkNotifications();
+        });
+
+        function initAuth() {
+            const user = JSON.parse(localStorage.getItem('currentUser'));
+            const authBtn = document.getElementById('authBtn');
+            
+            if (user) {
+                authBtn.textContent = '로그아웃';
+                authBtn.onclick = logout;
+            } else {
+                authBtn.textContent = '로그인';
+                authBtn.onclick = () => window.location.href = 'login.html';
+            }
+        }
+
+        function handleAuth() {
+            const user = JSON.parse(localStorage.getItem('currentUser'));
+            if (user) {
+                logout();
+            } else {
+                window.location.href = 'login.html';
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('currentUser');
+            window.location.reload();
+        }
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('active');
+        }
+
+        function toggleNotifications() {
+            const dropdown = document.getElementById('notificationsDropdown');
+            dropdown.classList.toggle('active');
+        }
+
+        function checkNotifications() {
+            const notifications = JSON.parse(localStorage.getItem('notifications') || '[]');
+            const badge = document.getElementById('notificationBadge');
+            const unread = notifications.filter(n => !n.read).length;
+            
+            if (unread > 0) {
+                badge.textContent = unread;
+                badge.style.display = 'block';
+            } else {
+                badge.style.display = 'none';
+            }
+
+            // Load notifications
+            const list = document.getElementById('notificationsList');
+            if (notifications.length > 0) {
+                list.innerHTML = notifications.slice(0, 5).map(n => `
+                    <div class="notification-item ${n.read ? 'read' : ''}" onclick="goToNotification('${n.link}', ${n.id})">
+                        <p>${n.message}</p>
+                        <span class="notification-time">${new Date(n.time).toLocaleString('ko-KR')}</span>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function goToNotification(link, id) {
+            const notifications = JSON.parse(localStorage.getItem('notifications') || '[]');
+            const notification = notifications.find(n => n.id === id);
+            if (notification) {
+                notification.read = true;
+                localStorage.setItem('notifications', JSON.stringify(notifications));
+            }
+            window.location.href = link;
+        }
+
+        function loadPopularCourses() {
+            const courses = JSON.parse(localStorage.getItem('courses') || '[]');
+            const container = document.getElementById('popularCourses');
+            
+            if (courses.length === 0) {
+                // Add default courses
+                const defaultCourses = [
+                    {
+                        id: 1,
+                        title: '애드센스 승인 완벽 가이드',
+                        description: '애드센스 승인을 위한 모든 조건과 최적화 전략',
+                        price: 29000,
+                        image: '📖',
+                        category: '승인'
+                    },
+                    {
+                        id: 2,
+                        title: '수익화 전략 마스터',
+                        description: '월 100만원 수익을 위한 실전 전략',
+                        price: 49000,
+                        image: '💰',
+                        category: '수익화'
+                    }
+                ];
+                localStorage.setItem('courses', JSON.stringify(defaultCourses));
+                displayCourses(defaultCourses);
+            } else {
+                displayCourses(courses.slice(0, 4));
+            }
+        }
+
+        function displayCourses(courses) {
+            const container = document.getElementById('popularCourses');
+            container.innerHTML = courses.map(course => `
+                <div class="course-card" onclick="window.location.href='course-detail.html?id=${course.id}'">
+                    <div class="course-image">${course.image}</div>
+                    <div class="course-content">
+                        <span class="course-category">${course.category}</span>
+                        <h3>${course.title}</h3>
+                        <p>${course.description}</p>
+                        <div class="course-footer">
+                            <span class="course-price">${course.price === 0 ? '무료' : course.price.toLocaleString() + '원'}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.notification-btn') && !e.target.closest('.notifications-dropdown')) {
+                document.getElementById('notificationsDropdown').classList.remove('active');
+            }
+            if (!e.target.closest('.sidebar') && !e.target.closest('.menu-toggle')) {
+                document.getElementById('sidebar').classList.remove('active');
+            }
+        });
+    </script>
+</body>
+  </html>
