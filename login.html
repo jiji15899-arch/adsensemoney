@@ -245,7 +245,7 @@
 
                 // 최초 관리자 설정 (특정 이메일이거나, DB에 유저가 없을 경우)
                 // 여기서는 ga100admin@gmail.com을 관리자로 지정하는 예시
-                const role = email === 'ga100admin@gmail.com' ? 'admin' : 'user';
+                const role = email === 'jiji15899@gmail.com' ? 'admin' : 'user';
 
                 // Firestore에 유저 데이터 저장
                 await setDoc(doc(db, "users", user.uid), {
