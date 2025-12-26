@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>전자책 - ga100</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <h1 class="logo" onclick="window.location.href='index.html'" style="cursor:pointer">ga100</h1>
+                <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+            </div>
+        </div>
+    </header>
+
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h2>ga100</h2>
+            <button class="close-sidebar" onclick="toggleSidebar()">✕</button>
+        </div>
+        <div class="sidebar-section">
+            <button class="auth-btn" id="authBtn" onclick="handleAuth()">로그인</button>
+        </div>
+        <div class="sidebar-section">
+            <h3>강의</h3>
+            <ul>
+                <li><a href="courses.html">모든 강의 보기</a></li>
+            </ul>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <div class="container">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; flex-wrap: wrap; gap: 15px;">
+                <h2>전자책 강의</h2>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <select id="categoryFilter" onchange="filterCourses()" style="padding: 10px; border-radius: 6px; border: 1px solid var(--border);">
+                        <option value="all">전체 카테고리</option>
+                        <option value="승인">애드센스 승인</option>
+                        <option value="수익화">애드센스 수익화</option>
+                        <option value="최적화">최적화</option>
+                        <option value="고급">고급 전략</option>
+                    </select>
+                    <select id="priceFilter" onchange="filterCourses()" style="padding: 10px; border-radius: 6px; border: 1px solid var(--border);">
+                        <option value="all">전체 가격</option>
+                        <option value="free">무료</option>
+                        <option value="paid">유료</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="course-grid" id="coursesGrid"></div>
+
+            <div id="emptyState" style="display: none; text-align: center; padding: 60px 20px;">
+                <div style="font-size: 64px; margin-bottom: 20px;">📚</div>
+                <h3 style="margin-bottom: 10px;">강의가 없습니다</h3>
+                <p style="color: var(--gray);">곧 새로운 강의가 업데이트될 예정입니다.</p>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-links">
+                <a href="my-home.html">마이홈</a>
+                <a href="revenue.html">수익인증</a>
+                <a href="courses.html">전자책</a>
+                <a href="community.html">커뮤니티</a>
+            </div>
+            <p class="copyright">© 2024 ga100. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+        let allCourses = [];
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('active');
+        }
+
+        function handleAuth() {
+            const user = JSON.parse(localStorage.getItem('currentUser'));
+            if (user) {
+                localStorage.removeItem('currentUser');
+                window.location.reload();
+            } else {
+                window.location.href = 'login.html';
+            }
+        }
+
+        function initAuth() {
+            const user = JSON.parse(localStorage.getItem('currentUser'));
+            const authBtn = document.getElementById('authBtn');
+            
+            if (user) {
+                authBtn.textContent = '로그아웃';
+            } else {
+                authBtn.textContent = '로그인';
+            }
+        }
+
+        function loadCourses() {
+            allCourses = JSON.parse(localStorage.getItem('courses') || '[]');
+            
+            // Add default courses if none exist
+            if (allCourses.length === 0) {
+                allCourses = [
+                    {
+                        id: 1,
+                        title: '애드센스 승인 완벽 가이드',
+                        description: '애드센스 승인을 위한 모든 조건과 최적화 전략을 다룹니다.',
+                        price: 29000,
+                        image: '📖',
+                        category: '승인',
+                        content: '애드센스 승인을 받기 위한 상세한 가이드입니다.',
+                        createdAt: new Date().toISOString()
+                    },
+                    {
+                        id: 2,
+                        title: '수익화 전략 마스터',
+                        description: '월 100만원 수익을 위한 실전 전략을 배웁니다.',
+                        price: 49000,
+                        image: '💰',
+                        category: '수익화',
+                        content: '효과적인 수익화 전략을 학습합니다.',
+                        createdAt: new Date().toISOString()
+                    },
+                    {
+                        id: 3,
+                        title: '애드센스 최적화 기법',
+                        description: 'RPM과 CTR을 극대화하는 최적화 방법론입니다.',
+                        price: 39000,
+                        image: '📊',
+                        category: '최적화',
+                        content: '광고 최적화의 모든 것을 다룹니다.',
+                        createdAt: new Date().toISOString()
+                    },
+                    {
+                        id: 4,
+                        title: '무료 시작 가이드',
+                        description: '애드센스를 처음 시작하는 분들을 위한 무료 강의입니다.',
+                        price: 0,
+                        image: '🎁',
+                        category: '승인',
+                        content: '애드센스 기초를 무료로 학습하세요.',
+                        createdAt: new Date().toISOString()
+                    }
+                ];
+                localStorage.setItem('courses', JSON.stringify(allCourses));
+            }
+
+            filterCourses();
+        }
+
+        function filterCourses() {
+            const categoryFilter = document.getElementById('categoryFilter').value;
+            const priceFilter = document.getElementById('priceFilter').value;
+
+            let filtered = allCourses;
+
+            if (categoryFilter !== 'all') {
+                filtered = filtered.filter(c => c.category === categoryFilter);
+            }
+
+            if (priceFilter === 'free') {
+                filtered = filtered.filter(c => c.price === 0);
+            } else if (priceFilter === 'paid') {
+                filtered = filtered.filter(c => c.price > 0);
+            }
+
+            displayCourses(filtered);
+        }
+
+        function displayCourses(courses) {
+            const grid = document.getElementById('coursesGrid');
+            const emptyState = document.getElementById('emptyState');
+
+            if (courses.length === 0) {
+                grid.style.display = 'none';
+                emptyState.style.display = 'block';
+                return;
+            }
+
+            grid.style.display = 'grid';
+            emptyState.style.display = 'none';
+
+            grid.innerHTML = courses.map(course => `
+                <div class="course-card" onclick="window.location.href='course-detail.html?id=${course.id}'">
+                    <div class="course-image">${course.image}</div>
+                    <div class="course-content">
+                        <span class="course-category">${course.category}</span>
+                        <h3>${course.title}</h3>
+                        <p>${course.description}</p>
+                        <div class="course-footer">
+                            <span class="course-price">${course.price === 0 ? '무료' : course.price.toLocaleString() + '원'}</span>
+                            <span class="badge badge-success">수강 가능</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Initialize
+        initAuth();
+        loadCourses();
+    </script>
+</body>
+</html>
