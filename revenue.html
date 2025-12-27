@@ -37,9 +37,10 @@
                 <div class="admin-panel" style="margin-bottom: 30px;">
                     <h3>수익 인증 등록</h3>
                     <form onsubmit="submitRevenue(event)">
+                        <div id="revenueAlert"></div>
                         <div class="form-group">
                             <label>수익 금액 (원)</label>
-                            <input type="number" id="revenueAmount" required min="0">
+                            <input type="number" id="revenueAmount" required min="0" step="1">
                         </div>
                         <div class="form-group">
                             <label>소감 (필수)</label>
@@ -54,14 +55,16 @@
                             <input type="text" id="revenueSubject" placeholder="예: 블로그, 유튜브, 웹사이트 등">
                         </div>
                         <div style="display: flex; gap: 10px;">
-                            <button type="submit" class="btn btn-primary">등록하기</button>
+                            <button type="submit" class="btn btn-primary" id="submitRevenueBtn">등록하기</button>
                             <button type="button" class="btn btn-secondary" onclick="hideUploadForm()">취소</button>
                         </div>
                     </form>
                 </div>
             </div>
 
-            <div id="revenueList"></div>
+            <div id="revenueList">
+                <div style="text-align: center; padding: 40px; color: var(--gray);">수익 인증을 불러오는 중...</div>
+            </div>
 
             <div id="emptyState" style="display: none; text-align: center; padding: 60px 20px;">
                 <div style="font-size: 64px; margin-bottom: 20px;">💰</div>
@@ -83,120 +86,155 @@
         </div>
     </footer>
 
-    <script>
-        let currentUser = JSON.parse(localStorage.getItem('currentUser'));
+    <script type="module">
+        import './firebase-config.js';
 
-        function toggleSidebar() {
-            document.getElementById('sidebar').classList.toggle('active');
-        }
+        let currentUser = null;
 
-        function handleAuth() {
-            if (currentUser) {
-                localStorage.removeItem('currentUser');
-                window.location.reload();
-            } else {
-                window.location.href = 'login.html';
-            }
-        }
+        document.addEventListener('DOMContentLoaded', async () => {
+            await initAuth();
+            await loadRevenues();
+        });
 
-        function initAuth() {
+        async function initAuth() {
+            const userSession = sessionStorage.getItem('currentUser');
             const authBtn = document.getElementById('authBtn');
             const uploadBtn = document.getElementById('uploadBtn');
             
-            if (currentUser) {
+            if (userSession) {
+                currentUser = JSON.parse(userSession);
                 authBtn.textContent = '로그아웃';
+                authBtn.onclick = logout;
                 uploadBtn.style.display = 'block';
             } else {
                 authBtn.textContent = '로그인';
+                authBtn.onclick = () => window.location.href = 'login.html';
                 uploadBtn.style.display = 'none';
             }
         }
 
-        function showUploadForm() {
-            document.getElementById('uploadFormContainer').style.display = 'block';
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+        window.toggleSidebar = function() {
+            document.getElementById('sidebar').classList.toggle('active');
+        };
+
+        window.handleAuth = function() {
+            if (currentUser) {
+                logout();
+            } else {
+                window.location.href = 'login.html';
+            }
+        };
+
+        async function logout() {
+            try {
+                await window.firebaseAuth.signOut();
+                sessionStorage.removeItem('currentUser');
+                window.location.reload();
+            } catch (error) {
+                console.error('Logout error:', error);
+                alert('로그아웃 중 오류가 발생했습니다.');
+            }
         }
 
-        function hideUploadForm() {
+        window.showUploadForm = function() {
+            document.getElementById('uploadFormContainer').style.display = 'block';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        window.hideUploadForm = function() {
             document.getElementById('uploadFormContainer').style.display = 'none';
+            document.getElementById('revenueAlert').innerHTML = '';
             document.getElementById('revenueAmount').value = '';
             document.getElementById('revenueThoughts').value = '';
             document.getElementById('revenueTips').value = '';
             document.getElementById('revenueSubject').value = '';
-        }
+        };
 
-        function submitRevenue(e) {
+        window.submitRevenue = async function(e) {
             e.preventDefault();
 
             const amount = parseInt(document.getElementById('revenueAmount').value);
             const thoughts = document.getElementById('revenueThoughts').value.trim();
             const tips = document.getElementById('revenueTips').value.trim();
             const subject = document.getElementById('revenueSubject').value.trim();
+            const alertDiv = document.getElementById('revenueAlert');
+            const submitBtn = document.getElementById('submitRevenueBtn');
 
-            let revenues = JSON.parse(localStorage.getItem('revenues') || '[]');
-            
-            revenues.unshift({
-                id: Date.now(),
-                author: currentUser.nickname,
-                amount: amount,
-                thoughts: thoughts,
-                tips: tips,
-                subject: subject,
-                createdAt: new Date().toISOString()
-            });
+            alertDiv.innerHTML = '';
+            submitBtn.disabled = true;
 
-            localStorage.setItem('revenues', JSON.stringify(revenues));
-            
-            alert('수익 인증이 등록되었습니다!');
-            hideUploadForm();
-            loadRevenues();
-        }
+            try {
+                await window.firebaseDB.addRevenue({
+                    author: currentUser.nickname,
+                    amount: amount,
+                    thoughts: thoughts,
+                    tips: tips,
+                    subject: subject
+                });
 
-        function loadRevenues() {
-            const revenues = JSON.parse(localStorage.getItem('revenues') || '[]');
-            const list = document.getElementById('revenueList');
-            const emptyState = document.getElementById('emptyState');
-
-            if (revenues.length === 0) {
-                list.innerHTML = '';
-                emptyState.style.display = 'block';
-                return;
+                alertDiv.innerHTML = '<div class="alert alert-success">수익 인증이 등록되었습니다!</div>';
+                
+                setTimeout(async () => {
+                    hideUploadForm();
+                    await loadRevenues();
+                    submitBtn.disabled = false;
+                }, 1500);
+            } catch (error) {
+                console.error('Error submitting revenue:', error);
+                alertDiv.innerHTML = '<div class="alert alert-error">수익 인증 등록 중 오류가 발생했습니다.</div>';
+                submitBtn.disabled = false;
             }
+        };
 
-            emptyState.style.display = 'none';
-            list.innerHTML = revenues.map(revenue => `
-                <div class="admin-panel" style="margin-bottom: 20px;">
-                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
-                        <div>
-                            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
-                                <strong style="font-size: 18px;">${revenue.author}</strong>
-                                ${revenue.subject ? `<span class="badge badge-success">${revenue.subject}</span>` : ''}
+        async function loadRevenues() {
+            try {
+                const revenues = await window.firebaseDB.getRevenues();
+                const list = document.getElementById('revenueList');
+                const emptyState = document.getElementById('emptyState');
+
+                if (revenues.length === 0) {
+                    list.innerHTML = '';
+                    emptyState.style.display = 'block';
+                    return;
+                }
+
+                emptyState.style.display = 'none';
+                list.innerHTML = revenues.map(revenue => {
+                    const revenueDate = revenue.createdAt?.toDate ? revenue.createdAt.toDate() : new Date();
+                    return `
+                        <div class="admin-panel" style="margin-bottom: 20px;">
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                                <div>
+                                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px; flex-wrap: wrap;">
+                                        <strong style="font-size: 18px;">${revenue.author}</strong>
+                                        ${revenue.subject ? `<span class="badge badge-success">${revenue.subject}</span>` : ''}
+                                    </div>
+                                    <span style="color: var(--gray); font-size: 14px;">${revenueDate.toLocaleDateString('ko-KR')}</span>
+                                </div>
+                                <div style="font-size: 28px; font-weight: bold; color: var(--primary);">
+                                    ${revenue.amount.toLocaleString()}원
+                                </div>
                             </div>
-                            <span style="color: var(--gray); font-size: 14px;">${new Date(revenue.createdAt).toLocaleDateString('ko-KR')}</span>
+                            
+                            <div style="margin-bottom: 15px;">
+                                <strong style="color: var(--dark); margin-bottom: 8px; display: block;">💭 소감</strong>
+                                <p style="line-height: 1.6; color: var(--dark); white-space: pre-wrap;">${revenue.thoughts}</p>
+                            </div>
+                            
+                            ${revenue.tips ? `
+                                <div style="margin-bottom: 15px; padding: 15px; background: var(--light-gray); border-radius: 8px;">
+                                    <strong style="color: var(--dark); margin-bottom: 8px; display: block;">💡 노하우/팁</strong>
+                                    <p style="line-height: 1.6; color: var(--dark); white-space: pre-wrap;">${revenue.tips}</p>
+                                </div>
+                            ` : ''}
                         </div>
-                        <div style="font-size: 28px; font-weight: bold; color: var(--primary);">
-                            ${revenue.amount.toLocaleString()}원
-                        </div>
-                    </div>
-                    
-                    <div style="margin-bottom: 15px;">
-                        <strong style="color: var(--dark); margin-bottom: 8px; display: block;">💭 소감</strong>
-                        <p style="line-height: 1.6; color: var(--dark);">${revenue.thoughts}</p>
-                    </div>
-                    
-                    ${revenue.tips ? `
-                        <div style="margin-bottom: 15px; padding: 15px; background: var(--light-gray); border-radius: 8px;">
-                            <strong style="color: var(--dark); margin-bottom: 8px; display: block;">💡 노하우/팁</strong>
-                            <p style="line-height: 1.6; color: var(--dark);">${revenue.tips}</p>
-                        </div>
-                    ` : ''}
-                </div>
-            `).join('');
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Error loading revenues:', error);
+                document.getElementById('revenueList').innerHTML = '<p style="color: var(--danger); padding: 20px; text-align: center;">수익 인증을 불러오는 중 오류가 발생했습니다.</p>';
+            }
         }
-
-        // Initialize
-        initAuth();
-        loadRevenues();
     </script>
 </body>
-</html>
+    </html>
