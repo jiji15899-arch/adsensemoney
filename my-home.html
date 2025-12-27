@@ -53,7 +53,9 @@
             <div class="admin-content active" id="my-courses">
                 <div class="admin-panel">
                     <h3>수강 중인 강의</h3>
-                    <div id="myCoursesList"></div>
+                    <div id="myCoursesList">
+                        <div style="text-align: center; padding: 40px; color: var(--gray);">강의를 불러오는 중...</div>
+                    </div>
                 </div>
             </div>
 
@@ -101,11 +103,11 @@
                         </div>
                         <div class="form-group">
                             <label>새 닉네임</label>
-                            <input type="text" id="newNickname">
+                            <input type="text" id="newNickname" placeholder="변경하지 않으려면 비워두세요">
                         </div>
                         <div class="form-group">
                             <label>새 비밀번호</label>
-                            <input type="password" id="newPassword">
+                            <input type="password" id="newPassword" placeholder="변경하지 않으려면 비워두세요">
                         </div>
                         <div class="form-group">
                             <label>새 비밀번호 확인</label>
@@ -130,116 +132,162 @@
         </div>
     </footer>
 
-    <script>
-        let currentUser = JSON.parse(localStorage.getItem('currentUser'));
+    <script type="module">
+        import './firebase-config.js';
 
-        if (!currentUser) {
-            window.location.href = 'login.html';
+        let currentUser = null;
+        let userData = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const userSession = sessionStorage.getItem('currentUser');
+            if (!userSession) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            currentUser = JSON.parse(userSession);
+            await loadUserData();
+            await loadMyCourses();
+            loadMyPoints();
+            loadQuestionCount();
+            loadProfileForm();
+        });
+
+        async function loadUserData() {
+            try {
+                userData = await window.firebaseDB.getUser(currentUser.nickname);
+            } catch (error) {
+                console.error('Error loading user data:', error);
+            }
         }
 
-        function toggleSidebar() {
+        window.toggleSidebar = function() {
             document.getElementById('sidebar').classList.toggle('active');
-        }
+        };
 
-        function logout() {
-            localStorage.removeItem('currentUser');
-            window.location.href = 'index.html';
+        async function logout() {
+            try {
+                await window.firebaseAuth.signOut();
+                sessionStorage.removeItem('currentUser');
+                window.location.href = 'index.html';
+            } catch (error) {
+                console.error('Logout error:', error);
+                alert('로그아웃 중 오류가 발생했습니다.');
+            }
         }
+        window.logout = logout;
 
-        function switchMyTab(tab) {
+        window.switchMyTab = function(tab) {
             document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.admin-content').forEach(c => c.classList.remove('active'));
             
             event.target.classList.add('active');
             document.getElementById(tab).classList.add('active');
-        }
+        };
 
-        function loadMyCourses() {
-            const courses = JSON.parse(localStorage.getItem('courses') || '[]');
-            const myCourses = courses.filter(c => currentUser.courses.includes(c.id));
-            const container = document.getElementById('myCoursesList');
+        async function loadMyCourses() {
+            try {
+                const allCourses = await window.firebaseDB.getCourses();
+                const myCourses = allCourses.filter(c => (userData.courses || []).includes(c.id));
+                const container = document.getElementById('myCoursesList');
 
-            if (myCourses.length === 0) {
-                container.innerHTML = '<p style="color: var(--gray); padding: 20px;">수강 중인 강의가 없습니다.</p>';
-                return;
-            }
+                if (myCourses.length === 0) {
+                    container.innerHTML = '<p style="color: var(--gray); padding: 20px;">수강 중인 강의가 없습니다.</p>';
+                    return;
+                }
 
-            container.innerHTML = `
-                <div class="course-grid">
-                    ${myCourses.map(course => `
-                        <div class="course-card" onclick="window.location.href='course-detail.html?id=${course.id}'">
-                            <div class="course-image">${course.image}</div>
-                            <div class="course-content">
-                                <h3>${course.title}</h3>
-                                <p>${course.description}</p>
+                container.innerHTML = `
+                    <div class="course-grid">
+                        ${myCourses.map(course => `
+                            <div class="course-card" onclick="window.location.href='course-detail.html?id=${course.id}'">
+                                <div class="course-image">${course.image || '📖'}</div>
+                                <div class="course-content">
+                                    <h3>${course.title}</h3>
+                                    <p>${course.description}</p>
+                                </div>
                             </div>
-                        </div>
-                    `).join('')}
-                </div>
-            `;
+                        `).join('')}
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading courses:', error);
+                document.getElementById('myCoursesList').innerHTML = '<p style="color: var(--danger); padding: 20px;">강의를 불러오는 중 오류가 발생했습니다.</p>';
+            }
         }
 
         function loadMyPoints() {
-            document.getElementById('myPoints').textContent = (currentUser.points || 0).toLocaleString() + ' P';
+            document.getElementById('myPoints').textContent = (userData.points || 0).toLocaleString() + ' P';
         }
 
         function loadQuestionCount() {
-            document.getElementById('questionCount').textContent = (currentUser.secretQuestions || 0) + '개';
+            document.getElementById('questionCount').textContent = (userData.secretQuestions || 0) + '개';
         }
 
         function loadProfileForm() {
             document.getElementById('currentNickname').value = currentUser.nickname;
         }
 
-        function handleProfileUpdate(e) {
+        window.handleProfileUpdate = async function(e) {
             e.preventDefault();
+            
             const newNickname = document.getElementById('newNickname').value.trim();
             const newPassword = document.getElementById('newPassword').value;
             const newPasswordConfirm = document.getElementById('newPasswordConfirm').value;
             const alertDiv = document.getElementById('profileAlert');
+
+            alertDiv.innerHTML = '';
 
             if (newPassword && newPassword !== newPasswordConfirm) {
                 alertDiv.innerHTML = '<div class="alert alert-error">비밀번호가 일치하지 않습니다.</div>';
                 return;
             }
 
-            let users = JSON.parse(localStorage.getItem('users') || '[]');
-            
-            // Check for duplicates (excluding current user)
-            if (newNickname && newNickname !== currentUser.nickname) {
-                const nicknameExists = users.some(u => u.nickname === newNickname);
-                if (nicknameExists) {
-                    alertDiv.innerHTML = '<div class="alert alert-error">이미 사용 중인 닉네임입니다.</div>';
-                    return;
-                }
+            if (!newNickname && !newPassword) {
+                alertDiv.innerHTML = '<div class="alert alert-error">변경할 정보를 입력해주세요.</div>';
+                return;
             }
 
-            if (newPassword) {
-                const passwordExists = users.some(u => u.password === newPassword && u.nickname !== currentUser.nickname);
-                if (passwordExists) {
-                    alertDiv.innerHTML = '<div class="alert alert-error">이미 사용 중인 비밀번호입니다.</div>';
-                    return;
+            try {
+                const updates = {};
+                
+                if (newNickname && newNickname !== currentUser.nickname) {
+                    // Check if nickname exists
+                    const allUsers = await window.firebaseDB.getAllUsers();
+                    const nicknameExists = allUsers.some(u => u.nickname === newNickname);
+                    if (nicknameExists) {
+                        alertDiv.innerHTML = '<div class="alert alert-error">이미 사용 중인 닉네임입니다.</div>';
+                        return;
+                    }
+                    updates.nickname = newNickname;
                 }
+
+                if (Object.keys(updates).length > 0) {
+                    await window.firebaseDB.updateUser(currentUser.nickname, updates);
+                }
+
+                // Update password if provided
+                if (newPassword) {
+                    const user = window.firebaseAuth.getCurrentUser();
+                    if (user) {
+                        await user.updatePassword(newPassword);
+                    }
+                }
+
+                alertDiv.innerHTML = '<div class="alert alert-success">정보가 수정되었습니다.</div>';
+                
+                if (newNickname) {
+                    sessionStorage.setItem('currentUser', JSON.stringify({
+                        ...currentUser,
+                        nickname: newNickname
+                    }));
+                }
+
+                setTimeout(() => window.location.reload(), 1500);
+            } catch (error) {
+                console.error('Error updating profile:', error);
+                alertDiv.innerHTML = '<div class="alert alert-error">정보 수정 중 오류가 발생했습니다.</div>';
             }
-
-            // Update user
-            const userIndex = users.findIndex(u => u.nickname === currentUser.nickname);
-            if (newNickname) users[userIndex].nickname = newNickname;
-            if (newPassword) users[userIndex].password = newPassword;
-
-            localStorage.setItem('users', JSON.stringify(users));
-            localStorage.setItem('currentUser', JSON.stringify(users[userIndex]));
-            currentUser = users[userIndex];
-
-            alertDiv.innerHTML = '<div class="alert alert-success">정보가 수정되었습니다.</div>';
-            setTimeout(() => window.location.reload(), 1500);
-        }
-
-        // Initialize
-        loadMyCourses();
-        loadMyPoints();
-        loadQuestionCount();
-        loadProfileForm();
+        };
     </script>
 </body>
-</html>
+    </html>
