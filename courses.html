@@ -52,7 +52,9 @@
                 </div>
             </div>
 
-            <div class="course-grid" id="coursesGrid"></div>
+            <div class="course-grid" id="coursesGrid">
+                <div style="text-align: center; padding: 40px; color: var(--gray);">강의를 불러오는 중...</div>
+            </div>
 
             <div id="emptyState" style="display: none; text-align: center; padding: 60px 20px;">
                 <div style="font-size: 64px; margin-bottom: 20px;">📚</div>
@@ -74,92 +76,69 @@
         </div>
     </footer>
 
-    <script>
-        let allCourses = [];
+    <script type="module">
+        import './firebase-config.js';
 
-        function toggleSidebar() {
-            document.getElementById('sidebar').classList.toggle('active');
+        let allCourses = [];
+        let currentUser = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await initAuth();
+            await loadCourses();
+        });
+
+        async function initAuth() {
+            const userData = sessionStorage.getItem('currentUser');
+            const authBtn = document.getElementById('authBtn');
+            
+            if (userData) {
+                currentUser = JSON.parse(userData);
+                authBtn.textContent = '로그아웃';
+                authBtn.onclick = logout;
+            } else {
+                authBtn.textContent = '로그인';
+                authBtn.onclick = () => window.location.href = 'login.html';
+            }
         }
 
-        function handleAuth() {
-            const user = JSON.parse(localStorage.getItem('currentUser'));
-            if (user) {
-                localStorage.removeItem('currentUser');
-                window.location.reload();
+        window.toggleSidebar = function() {
+            document.getElementById('sidebar').classList.toggle('active');
+        };
+
+        window.handleAuth = function() {
+            if (currentUser) {
+                logout();
             } else {
                 window.location.href = 'login.html';
             }
-        }
+        };
 
-        function initAuth() {
-            const user = JSON.parse(localStorage.getItem('currentUser'));
-            const authBtn = document.getElementById('authBtn');
-            
-            if (user) {
-                authBtn.textContent = '로그아웃';
-            } else {
-                authBtn.textContent = '로그인';
+        async function logout() {
+            try {
+                await window.firebaseAuth.signOut();
+                sessionStorage.removeItem('currentUser');
+                window.location.reload();
+            } catch (error) {
+                console.error('Logout error:', error);
+                alert('로그아웃 중 오류가 발생했습니다.');
             }
         }
 
-        function loadCourses() {
-            allCourses = JSON.parse(localStorage.getItem('courses') || '[]');
-            
-            // Add default courses if none exist
-            if (allCourses.length === 0) {
-                allCourses = [
-                    {
-                        id: 1,
-                        title: '애드센스 승인 완벽 가이드',
-                        description: '애드센스 승인을 위한 모든 조건과 최적화 전략을 다룹니다.',
-                        price: 29000,
-                        image: '📖',
-                        category: '승인',
-                        content: '애드센스 승인을 받기 위한 상세한 가이드입니다.',
-                        createdAt: new Date().toISOString()
-                    },
-                    {
-                        id: 2,
-                        title: '수익화 전략 마스터',
-                        description: '월 100만원 수익을 위한 실전 전략을 배웁니다.',
-                        price: 49000,
-                        image: '💰',
-                        category: '수익화',
-                        content: '효과적인 수익화 전략을 학습합니다.',
-                        createdAt: new Date().toISOString()
-                    },
-                    {
-                        id: 3,
-                        title: '애드센스 최적화 기법',
-                        description: 'RPM과 CTR을 극대화하는 최적화 방법론입니다.',
-                        price: 39000,
-                        image: '📊',
-                        category: '최적화',
-                        content: '광고 최적화의 모든 것을 다룹니다.',
-                        createdAt: new Date().toISOString()
-                    },
-                    {
-                        id: 4,
-                        title: '무료 시작 가이드',
-                        description: '애드센스를 처음 시작하는 분들을 위한 무료 강의입니다.',
-                        price: 0,
-                        image: '🎁',
-                        category: '승인',
-                        content: '애드센스 기초를 무료로 학습하세요.',
-                        createdAt: new Date().toISOString()
-                    }
-                ];
-                localStorage.setItem('courses', JSON.stringify(allCourses));
+        async function loadCourses() {
+            try {
+                allCourses = await window.firebaseDB.getCourses();
+                filterCourses();
+            } catch (error) {
+                console.error('Error loading courses:', error);
+                document.getElementById('coursesGrid').innerHTML = '<p style="text-align: center; color: var(--danger); padding: 40px;">강의를 불러오는 중 오류가 발생했습니다.</p>';
             }
-
-            filterCourses();
         }
 
-        function filterCourses() {
+        window.filterCourses = function() {
             const categoryFilter = document.getElementById('categoryFilter').value;
             const priceFilter = document.getElementById('priceFilter').value;
 
-            let filtered = allCourses;
+            let filtered = [...allCourses];
 
             if (categoryFilter !== 'all') {
                 filtered = filtered.filter(c => c.category === categoryFilter);
@@ -172,7 +151,7 @@
             }
 
             displayCourses(filtered);
-        }
+        };
 
         function displayCourses(courses) {
             const grid = document.getElementById('coursesGrid');
@@ -189,7 +168,7 @@
 
             grid.innerHTML = courses.map(course => `
                 <div class="course-card" onclick="window.location.href='course-detail.html?id=${course.id}'">
-                    <div class="course-image">${course.image}</div>
+                    <div class="course-image">${course.image || '📖'}</div>
                     <div class="course-content">
                         <span class="course-category">${course.category}</span>
                         <h3>${course.title}</h3>
@@ -202,10 +181,6 @@
                 </div>
             `).join('');
         }
-
-        // Initialize
-        initAuth();
-        loadCourses();
     </script>
 </body>
 </html>
