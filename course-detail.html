@@ -29,6 +29,8 @@
             padding: 30px;
             border-radius: 12px;
             height: fit-content;
+            position: sticky;
+            top: 80px;
         }
         .purchase-btn {
             width: 100%;
@@ -41,35 +43,52 @@
             font-weight: 600;
             cursor: pointer;
             margin-bottom: 15px;
+            transition: background 0.2s;
         }
-        .purchase-btn:hover {
+        .purchase-btn:hover:not(:disabled) {
             background: var(--primary-dark);
         }
         .purchase-btn:disabled {
             background: var(--gray);
             cursor: not-allowed;
         }
-        .download-btn {
-            display: block;
+        .use-points-btn {
             width: 100%;
-            padding: 15px;
-            background: var(--success);
+            padding: 12px;
+            background: var(--secondary);
             color: var(--white);
-            text-align: center;
-            text-decoration: none;
+            border: none;
             border-radius: 8px;
-            font-size: 18px;
-            font-weight: bold;
-            margin-top: 15px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.2s;
         }
-        .download-btn:hover {
-            background: #059669;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        .use-points-btn:hover:not(:disabled) {
+            background: #0891b2;
+        }
+        .use-points-btn:disabled {
+            background: var(--gray);
+            cursor: not-allowed;
+        }
+        .review-form {
+            background: var(--light-gray);
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 30px;
+        }
+        .review-item {
+            background: var(--white);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
         @media (max-width: 768px) {
             .course-info {
                 grid-template-columns: 1fr;
+            }
+            .course-sidebar {
+                position: static;
             }
         }
     </style>
@@ -96,201 +115,315 @@
 
     <main class="main-content">
         <div class="container">
-            <div class="course-header" id="courseHeader"></div>
+            <div class="course-header" id="courseHeader">
+                <div style="text-align: center; padding: 20px;">강의를 불러오는 중...</div>
+            </div>
 
             <div class="course-info">
                 <div class="course-main">
                     <div id="courseContent"></div>
+
+                    <div style="margin-top: 40px;">
+                        <h3 style="margin-bottom: 20px;">수강 후기</h3>
+                        <div id="reviewsList"></div>
+                        <div id="reviewForm"></div>
+                    </div>
                 </div>
 
-                <div class="course-sidebar">
-                    <div id="courseSidebar"></div>
-                </div>
+                <div class="course-sidebar" id="courseSidebar"></div>
             </div>
         </div>
     </main>
 
-    <div class="modal" id="purchaseModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>수강 신청 / 결제</h3>
-                <button class="modal-close" onclick="closePurchaseModal()">✕</button>
-            </div>
-            <div style="margin-bottom: 20px;">
-                <p style="margin-bottom: 10px; color: var(--gray);">아래 계좌/링크로 송금 후 <strong>입금자명</strong>을 입력하고 승인 요청을 해주세요.</p>
-                <div style="background: var(--light-gray); padding: 15px; border-radius: 8px; font-weight: bold; color: var(--primary); word-break: break-all;" id="modalPaymentInfo">
-                    </div>
-            </div>
-            <form onsubmit="submitPurchaseRequest(event)">
-                <div class="form-group">
-                    <label>입금자명</label>
-                    <input type="text" id="depositorName" required placeholder="예: 홍길동">
-                </div>
-                <div class="alert alert-info">
-                    관리자 승인 후 다운로드 버튼이 생성됩니다. (최대 24시간 소요)
-                </div>
-                <button type="submit" class="btn btn-primary" style="width: 100%;">입금 확인 요청</button>
-            </form>
-        </div>
-    </div>
-
     <footer class="footer">
         <div class="container">
+            <div class="footer-links">
+                <a href="my-home.html">마이홈</a>
+                <a href="revenue.html">수익인증</a>
+                <a href="courses.html">전자책</a>
+                <a href="community.html">커뮤니티</a>
+            </div>
             <p class="copyright">© 2024 ga100. All rights reserved.</p>
         </div>
     </footer>
 
-    <script>
+    <script type="module">
+        import './firebase-config.js';
+
         const urlParams = new URLSearchParams(window.location.search);
-        const courseId = parseInt(urlParams.get('id'));
-        let currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        const courseId = urlParams.get('id');
+        let currentUser = null;
+        let userData = null;
         let course = null;
 
-        function toggleSidebar() {
-            document.getElementById('sidebar').classList.toggle('active');
+        document.addEventListener('DOMContentLoaded', async () => {
+            await initAuth();
+            if (courseId) {
+                await loadCourse();
+            } else {
+                alert('강의 ID가 없습니다.');
+                window.location.href = 'courses.html';
+            }
+        });
+
+        async function initAuth() {
+            const userSession = sessionStorage.getItem('currentUser');
+            const authBtn = document.getElementById('authBtn');
+            
+            if (userSession) {
+                currentUser = JSON.parse(userSession);
+                userData = await window.firebaseDB.getUser(currentUser.nickname);
+                authBtn.textContent = '로그아웃';
+                authBtn.onclick = logout;
+            } else {
+                authBtn.textContent = '로그인';
+                authBtn.onclick = () => window.location.href = 'login.html';
+            }
         }
 
-        function handleAuth() {
+        window.toggleSidebar = function() {
+            document.getElementById('sidebar').classList.toggle('active');
+        };
+
+        window.handleAuth = function() {
             if (currentUser) {
-                localStorage.removeItem('currentUser');
-                window.location.reload();
+                logout();
             } else {
                 window.location.href = 'login.html';
             }
-        }
+        };
 
-        function initAuth() {
-            const authBtn = document.getElementById('authBtn');
-            if (currentUser) {
-                authBtn.textContent = '로그아웃';
-            } else {
-                authBtn.textContent = '로그인';
+        async function logout() {
+            try {
+                await window.firebaseAuth.signOut();
+                sessionStorage.removeItem('currentUser');
+                window.location.reload();
+            } catch (error) {
+                console.error('Logout error:', error);
+                alert('로그아웃 중 오류가 발생했습니다.');
             }
         }
 
-        function loadCourse() {
-            const courses = JSON.parse(localStorage.getItem('courses') || '[]');
-            course = courses.find(c => c.id === courseId);
+        async function loadCourse() {
+            try {
+                course = await window.firebaseDB.getCourse(courseId);
 
-            if (!course) {
-                alert('강의를 찾을 수 없습니다.');
-                window.location.href = 'courses.html';
-                return;
+                if (!course) {
+                    alert('강의를 찾을 수 없습니다.');
+                    window.location.href = 'courses.html';
+                    return;
+                }
+
+                // Course Header
+                document.getElementById('courseHeader').innerHTML = `
+                    <span class="course-category" style="background: rgba(255,255,255,0.2); color: var(--white);">${course.category}</span>
+                    <h2 style="margin: 15px 0;">${course.title}</h2>
+                    <p style="opacity: 0.95;">${course.description}</p>
+                `;
+
+                // Course Content
+                const hasAccess = userData && userData.courses && userData.courses.includes(courseId);
+                document.getElementById('courseContent').innerHTML = `
+                    <h3 style="margin-bottom: 15px;">강의 내용</h3>
+                    ${hasAccess ? `
+                        <div style="line-height: 1.8; white-space: pre-wrap;">
+                            ${course.content || '강의 내용이 준비 중입니다.'}
+                        </div>
+                    ` : `
+                        <div class="alert alert-info">
+                            이 강의를 수강하려면 결제가 필요합니다.
+                        </div>
+                        <div style="background: var(--light-gray); padding: 50px 30px; border-radius: 8px; text-align: center; color: var(--gray);">
+                            <div style="font-size: 64px; margin-bottom: 15px;">🔒</div>
+                            <p style="font-size: 18px;">수강 신청 후 이용 가능합니다</p>
+                        </div>
+                    `}
+                `;
+
+                loadSidebar();
+                await loadReviews();
+            } catch (error) {
+                console.error('Error loading course:', error);
+                document.getElementById('courseHeader').innerHTML = '<p style="color: var(--danger); padding: 20px;">강의를 불러오는 중 오류가 발생했습니다.</p>';
             }
+        }
 
-            // Header
-            document.getElementById('courseHeader').innerHTML = `
-                <span class="course-category" style="background: rgba(255,255,255,0.2); color: var(--white);">${course.category}</span>
-                <h2 style="margin: 15px 0;">${course.title}</h2>
-                <p style="opacity: 0.95;">${course.description}</p>
-            `;
-
-            const hasAccess = currentUser && currentUser.courses.includes(courseId);
-            
-            // Content
-            document.getElementById('courseContent').innerHTML = `
-                <h3 style="margin-bottom: 15px;">강의 내용</h3>
-                <div style="line-height: 1.8;">
-                    ${course.content}
-                </div>
-                ${hasAccess ? `
-                    <div style="margin-top: 30px; padding: 20px; background: #ecfdf5; border-radius: 8px; border: 1px solid #10b981;">
-                        <h4 style="color: #047857; margin-bottom: 10px;">🎉 수강 중인 강의입니다</h4>
-                        <p>상단 혹은 우측의 다운로드 버튼을 통해 전자책을 받아보세요.</p>
-                    </div>
-                ` : ''}
-            `;
-
-            // Sidebar (Check for pending request)
-            const requests = JSON.parse(localStorage.getItem('paymentRequests') || '[]');
-            const isPending = currentUser && requests.some(r => r.nickname === currentUser.nickname && r.courseId === courseId);
+        function loadSidebar() {
+            const hasAccess = userData && userData.courses && userData.courses.includes(courseId);
+            const pointCost = Math.floor(course.price * 0.4);
 
             document.getElementById('courseSidebar').innerHTML = `
                 <div style="text-align: center; margin-bottom: 20px;">
-                    <div style="font-size: 64px;">${course.image}</div>
+                    <div style="font-size: 64px;">${course.image || '📖'}</div>
                 </div>
                 <div style="font-size: 32px; font-weight: bold; color: var(--primary); text-align: center; margin-bottom: 20px;">
                     ${course.price === 0 ? '무료' : course.price.toLocaleString() + '원'}
                 </div>
-                
                 ${hasAccess ? `
-                    <div class="alert alert-success">✓ 구매 완료</div>
-                    ${course.downloadUrl ? `
-                        <a href="${course.downloadUrl}" target="_blank" class="download-btn">📥 전자책 다운로드</a>
-                    ` : '<div class="alert alert-info">다운로드 링크가 준비 중입니다.</div>'}
-                ` : isPending ? `
-                    <button class="purchase-btn" disabled>승인 대기 중...</button>
-                    <div class="alert alert-info">관리자 확인 중입니다.</div>
+                    <div class="alert alert-success" style="text-align: center;">✓ 수강 중</div>
                 ` : `
-                    <button class="purchase-btn" onclick="openPurchaseModal()" ${!currentUser ? 'disabled' : ''}>
-                        ${course.price === 0 ? '무료 수강 신청' : '수강 신청 / 다운로드'}
+                    <button class="purchase-btn" onclick="handlePurchase()" ${!currentUser ? 'disabled' : ''}>
+                        ${course.price === 0 ? '무료 수강 신청' : '수강 신청'}
                     </button>
-                    ${!currentUser ? '<p style="color: var(--gray); text-align: center; margin-top: 15px;">로그인 후 신청 가능</p>' : ''}
+                    ${currentUser && course.price > 0 ? `
+                        <div style="margin-bottom: 15px; padding: 15px; background: var(--light-gray); border-radius: 8px; text-align: center;">
+                            <div style="font-size: 12px; color: var(--gray); margin-bottom: 5px;">포인트로 5일 수강</div>
+                            <div style="font-size: 18px; font-weight: bold; color: var(--secondary);">${pointCost.toLocaleString()} P</div>
+                            <div style="font-size: 12px; color: var(--gray); margin-top: 5px;">보유: ${(userData.points || 0).toLocaleString()} P</div>
+                        </div>
+                        <button class="use-points-btn" onclick="usePoints()" ${(userData.points || 0) < pointCost ? 'disabled' : ''}>
+                            ${(userData.points || 0) < pointCost ? '포인트 부족' : '포인트 사용하기'}
+                        </button>
+                    ` : ''}
+                    ${!currentUser ? '<p style="color: var(--gray); text-align: center; margin-top: 15px; font-size: 14px;">로그인 후 수강 가능합니다</p>' : ''}
                 `}
             `;
         }
 
-        function openPurchaseModal() {
-            if (course.price === 0) {
-                // Free course - instant access
-                addCourseToUser();
+        window.handlePurchase = async function() {
+            if (!currentUser) {
+                alert('로그인이 필요합니다.');
+                window.location.href = 'login.html';
                 return;
             }
+
+            try {
+                if (course.price === 0) {
+                    // Free course
+                    const courses = userData.courses || [];
+                    courses.push(courseId);
+                    await window.firebaseDB.updateUser(currentUser.nickname, { courses });
+                    
+                    alert('무료 강의 신청이 완료되었습니다!');
+                    window.location.reload();
+                } else {
+                    // Paid course - record sale
+                    if (confirm(`${course.price.toLocaleString()}원을 결제하시겠습니까?`)) {
+                        await window.firebaseDB.addSale({
+                            buyer: currentUser.nickname,
+                            courseId: courseId,
+                            courseName: course.title,
+                            amount: course.price
+                        });
+
+                        const courses = userData.courses || [];
+                        courses.push(courseId);
+                        await window.firebaseDB.updateUser(currentUser.nickname, { courses });
+
+                        alert('결제가 완료되었습니다!');
+                        window.location.reload();
+                    }
+                }
+            } catch (error) {
+                console.error('Purchase error:', error);
+                alert('결제 중 오류가 발생했습니다.');
+            }
+        };
+
+        window.usePoints = async function() {
+            const pointCost = Math.floor(course.price * 0.4);
             
-            // Paid course - show modal
-            document.getElementById('modalPaymentInfo').textContent = course.paymentInfo || '관리자가 결제 정보를 설정하지 않았습니다.';
-            document.getElementById('purchaseModal').classList.add('active');
+            if ((userData.points || 0) < pointCost) {
+                alert(`포인트가 부족합니다. (보유: ${userData.points || 0}P, 필요: ${pointCost}P)`);
+                return;
+            }
+
+            if (confirm(`${pointCost}P를 사용하여 5일간 수강하시겠습니까?`)) {
+                try {
+                    const newPoints = (userData.points || 0) - pointCost;
+                    const courses = userData.courses || [];
+                    if (!courses.includes(courseId)) {
+                        courses.push(courseId);
+                    }
+
+                    await window.firebaseDB.updateUser(currentUser.nickname, {
+                        points: newPoints,
+                        courses: courses
+                    });
+
+                    alert('포인트 결제가 완료되었습니다! 5일간 수강 가능합니다.');
+                    window.location.reload();
+                } catch (error) {
+                    console.error('Points error:', error);
+                    alert('포인트 사용 중 오류가 발생했습니다.');
+                }
+            }
+        };
+
+        async function loadReviews() {
+            try {
+                const reviews = await window.firebaseDB.getReviews(courseId);
+                const reviewsList = document.getElementById('reviewsList');
+
+                if (reviews.length === 0) {
+                    reviewsList.innerHTML = '<p style="color: var(--gray); padding: 20px; text-align: center;">아직 후기가 없습니다. 첫 번째 후기를 남겨주세요!</p>';
+                } else {
+                    reviewsList.innerHTML = reviews.map(review => {
+                        const reviewDate = review.createdAt?.toDate ? review.createdAt.toDate() : new Date();
+                        return `
+                            <div class="review-item">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                                    <strong>${review.author}</strong>
+                                    <span style="color: var(--gray); font-size: 14px;">${reviewDate.toLocaleDateString('ko-KR')}</span>
+                                </div>
+                                <p style="line-height: 1.6;">${review.content}</p>
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+                // Show review form
+                const reviewForm = document.getElementById('reviewForm');
+                const hasAccess = userData && userData.courses && userData.courses.includes(courseId);
+                const hasReviewed = reviews.some(r => r.author === currentUser?.nickname);
+
+                if (hasAccess && !hasReviewed) {
+                    reviewForm.innerHTML = `
+                        <div class="review-form">
+                            <h4 style="margin-bottom: 15px;">후기 작성하기</h4>
+                            <form onsubmit="submitReview(event)">
+                                <div class="form-group">
+                                    <textarea id="reviewContent" required placeholder="강의 후기를 작성해주세요..." style="min-height: 120px;"></textarea>
+                                </div>
+                                <div class="alert alert-info" style="font-size: 14px; margin-bottom: 15px;">
+                                    💡 후기 작성 시 시크릿 질문권 1개를 획득합니다.
+                                </div>
+                                <button type="submit" class="btn btn-primary">후기 등록</button>
+                            </form>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading reviews:', error);
+            }
         }
 
-        function closePurchaseModal() {
-            document.getElementById('purchaseModal').classList.remove('active');
-        }
-
-        function submitPurchaseRequest(e) {
+        window.submitReview = async function(e) {
             e.preventDefault();
-            const depositor = document.getElementById('depositorName').value.trim();
             
-            if (!depositor) return;
+            const content = document.getElementById('reviewContent').value.trim();
+            if (!content) return;
 
-            let requests = JSON.parse(localStorage.getItem('paymentRequests') || '[]');
-            
-            // Prevent duplicate requests
-            if (requests.some(r => r.nickname === currentUser.nickname && r.courseId === courseId)) {
-                alert('이미 승인 대기 중인 요청이 있습니다.');
-                return;
-            }
+            try {
+                await window.firebaseDB.addReview({
+                    courseId: courseId,
+                    author: currentUser.nickname,
+                    content: content
+                });
 
-            requests.push({
-                id: Date.now(),
-                nickname: currentUser.nickname,
-                courseId: courseId,
-                depositor: depositor,
-                createdAt: new Date().toISOString()
-            });
+                // Add secret question ticket
+                const newQuestions = (userData.secretQuestions || 0) + 1;
+                await window.firebaseDB.updateUser(currentUser.nickname, {
+                    secretQuestions: newQuestions
+                });
 
-            localStorage.setItem('paymentRequests', JSON.stringify(requests));
-            
-            alert('승인 요청이 완료되었습니다! 관리자 확인 후 다운로드가 가능해집니다.');
-            closePurchaseModal();
-            loadCourse(); // Refresh UI
-        }
-
-        function addCourseToUser() {
-            let users = JSON.parse(localStorage.getItem('users') || '[]');
-            const userIndex = users.findIndex(u => u.nickname === currentUser.nickname);
-            
-            if (!users[userIndex].courses.includes(courseId)) {
-                users[userIndex].courses.push(courseId);
-                localStorage.setItem('users', JSON.stringify(users));
-                localStorage.setItem('currentUser', JSON.stringify(users[userIndex]));
-                currentUser = users[userIndex];
-                alert('수강 신청이 완료되었습니다! 다운로드 버튼이 활성화됩니다.');
+                alert('후기가 등록되었습니다! 시크릿 질문권 1개를 획득했습니다.');
                 window.location.reload();
+            } catch (error) {
+                console.error('Error submitting review:', error);
+                alert('후기 등록 중 오류가 발생했습니다.');
             }
-        }
-
-        initAuth();
-        loadCourse();
+        };
     </script>
 </body>
-</html>
+    </html>
