@@ -41,13 +41,13 @@
             <!-- Notice -->
             <div class="admin-content active" id="notice-content">
                 <div style="margin-bottom: 20px;" id="noticeWriteBtn"></div>
-                <div id="noticeList"></div>
+                <div id="noticeList"><div style="text-align: center; padding: 40px; color: var(--gray);">게시글을 불러오는 중...</div></div>
             </div>
 
             <!-- Secret Questions -->
             <div class="admin-content" id="secret-content">
                 <div style="margin-bottom: 20px;" id="secretWriteBtn"></div>
-                <div id="secretList"></div>
+                <div id="secretList"><div style="text-align: center; padding: 40px; color: var(--gray);">게시글을 불러오는 중...</div></div>
             </div>
 
             <!-- Tips -->
@@ -55,7 +55,7 @@
                 <div style="margin-bottom: 20px;">
                     <button class="btn btn-primary" onclick="showPostForm('tips')" id="tipsBtn">노하우 작성</button>
                 </div>
-                <div id="tipsList"></div>
+                <div id="tipsList"><div style="text-align: center; padding: 40px; color: var(--gray);">게시글을 불러오는 중...</div></div>
             </div>
 
             <!-- Free Board -->
@@ -63,7 +63,7 @@
                 <div style="margin-bottom: 20px;">
                     <button class="btn btn-primary" onclick="showPostForm('free')" id="freeBtn">글 작성</button>
                 </div>
-                <div id="freeList"></div>
+                <div id="freeList"><div style="text-align: center; padding: 40px; color: var(--gray);">게시글을 불러오는 중...</div></div>
             </div>
 
             <!-- QnA -->
@@ -71,7 +71,7 @@
                 <div style="margin-bottom: 20px;">
                     <button class="btn btn-primary" onclick="showPostForm('qna')" id="qnaBtn">질문 작성</button>
                 </div>
-                <div id="qnaList"></div>
+                <div id="qnaList"><div style="text-align: center; padding: 40px; color: var(--gray);">게시글을 불러오는 중...</div></div>
             </div>
         </div>
     </main>
@@ -84,6 +84,7 @@
                 <button class="modal-close" onclick="closePostModal()">✕</button>
             </div>
             <form onsubmit="submitPost(event)">
+                <div id="postAlert"></div>
                 <div class="form-group">
                     <label>제목</label>
                     <input type="text" id="postTitle" required>
@@ -92,15 +93,14 @@
                     <label>내용</label>
                     <textarea id="postContent" required style="min-height: 200px;"></textarea>
                 </div>
-                <div id="postAlert"></div>
-                <button type="submit" class="btn btn-primary">등록</button>
+                <button type="submit" class="btn btn-primary" id="postSubmitBtn">등록</button>
             </form>
         </div>
     </div>
 
     <!-- Post Detail Modal -->
     <div class="modal" id="detailModal">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 700px;">
             <div class="modal-header">
                 <h3>게시글</h3>
                 <button class="modal-close" onclick="closeDetailModal()">✕</button>
@@ -121,33 +121,33 @@
         </div>
     </footer>
 
-    <script>
-        let currentUser = JSON.parse(localStorage.getItem('currentUser'));
+    <script type="module">
+        import './firebase-config.js';
+
+        let currentUser = null;
+        let userData = null;
         let currentPostType = '';
         const urlParams = new URLSearchParams(window.location.search);
         const initialTab = urlParams.get('tab') || 'notice';
 
-        function toggleSidebar() {
-            document.getElementById('sidebar').classList.toggle('active');
-        }
+        document.addEventListener('DOMContentLoaded', async () => {
+            await initAuth();
+            await loadInitialTab();
+        });
 
-        function handleAuth() {
-            if (currentUser) {
-                localStorage.removeItem('currentUser');
-                window.location.reload();
-            } else {
-                window.location.href = 'login.html';
-            }
-        }
-
-        function initAuth() {
+        async function initAuth() {
+            const userSession = sessionStorage.getItem('currentUser');
             const authBtn = document.getElementById('authBtn');
             
-            if (currentUser) {
+            if (userSession) {
+                currentUser = JSON.parse(userSession);
+                userData = await window.firebaseDB.getUser(currentUser.nickname);
                 authBtn.textContent = '로그아웃';
+                authBtn.onclick = logout;
                 initWriteButtons();
             } else {
                 authBtn.textContent = '로그인';
+                authBtn.onclick = () => window.location.href = 'login.html';
                 ['tipsBtn', 'freeBtn', 'qnaBtn'].forEach(id => {
                     const btn = document.getElementById(id);
                     if (btn) btn.disabled = true;
@@ -157,12 +157,12 @@
 
         function initWriteButtons() {
             // Notice write button (admin/manager only)
-            if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager')) {
+            if (userData && (userData.role === 'admin' || userData.role === 'manager')) {
                 document.getElementById('noticeWriteBtn').innerHTML = '<button class="btn btn-primary" onclick="showPostForm(\'notice\')">공지 작성</button>';
             }
 
             // Secret question button
-            const secretQuestions = currentUser?.secretQuestions || 0;
+            const secretQuestions = userData?.secretQuestions || 0;
             document.getElementById('secretWriteBtn').innerHTML = `
                 <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
                     <button class="btn btn-primary" onclick="showPostForm('secret')" ${secretQuestions === 0 ? 'disabled' : ''}>시크릿 질문하기</button>
@@ -171,29 +171,67 @@
             `;
         }
 
-        function switchTab(tab) {
+        async function loadInitialTab() {
+            const tabButtons = ['notice', 'secret', 'tips', 'free', 'qna'];
+            const tabIndex = tabButtons.indexOf(initialTab);
+            
+            document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.admin-content').forEach(c => c.classList.remove('active'));
+            
+            if (tabIndex >= 0) {
+                document.querySelectorAll('.admin-tab')[tabIndex].classList.add('active');
+                document.getElementById(initialTab + '-content').classList.add('active');
+            }
+
+            for (const tab of tabButtons) {
+                await loadPosts(tab);
+            }
+        }
+
+        window.toggleSidebar = function() {
+            document.getElementById('sidebar').classList.toggle('active');
+        };
+
+        window.handleAuth = function() {
+            if (currentUser) {
+                logout();
+            } else {
+                window.location.href = 'login.html';
+            }
+        };
+
+        async function logout() {
+            try {
+                await window.firebaseAuth.signOut();
+                sessionStorage.removeItem('currentUser');
+                window.location.reload();
+            } catch (error) {
+                console.error('Logout error:', error);
+                alert('로그아웃 중 오류가 발생했습니다.');
+            }
+        }
+
+        window.switchTab = async function(tab) {
             document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.admin-content').forEach(c => c.classList.remove('active'));
             
             event.target.classList.add('active');
             document.getElementById(tab + '-content').classList.add('active');
-            
-            loadPosts(tab);
-        }
+        };
 
-        function showPostForm(type) {
+        window.showPostForm = function(type) {
             if (!currentUser) {
                 alert('로그인이 필요합니다.');
                 window.location.href = 'login.html';
                 return;
             }
 
-            if (type === 'notice' && currentUser.role !== 'admin' && currentUser.role !== 'manager') {
+            if (type === 'notice' && userData.role !== 'admin' && userData.role !== 'manager') {
                 alert('공지는 관리자만 작성할 수 있습니다.');
                 return;
             }
 
-            if (type === 'secret' && (currentUser.secretQuestions || 0) === 0) {
+            if (type === 'secret' && (userData.secretQuestions || 0) === 0) {
                 alert('시크릿 질문권이 없습니다.');
                 return;
             }
@@ -208,185 +246,185 @@
             };
             document.getElementById('modalTitle').textContent = titles[type];
             document.getElementById('postModal').classList.add('active');
-        }
+        };
 
-        function closePostModal() {
+        window.closePostModal = function() {
             document.getElementById('postModal').classList.remove('active');
             document.getElementById('postTitle').value = '';
             document.getElementById('postContent').value = '';
             document.getElementById('postAlert').innerHTML = '';
-        }
+        };
 
-        function submitPost(e) {
+        window.submitPost = async function(e) {
             e.preventDefault();
             
             const title = document.getElementById('postTitle').value.trim();
             const content = document.getElementById('postContent').value.trim();
+            const alertDiv = document.getElementById('postAlert');
+            const submitBtn = document.getElementById('postSubmitBtn');
 
-            let posts = JSON.parse(localStorage.getItem('posts') || '[]');
-            
-            const newPost = {
-                id: Date.now(),
-                type: currentPostType,
-                title: title,
-                content: content,
-                author: currentUser.nickname,
-                createdAt: new Date().toISOString(),
-                comments: []
-            };
+            alertDiv.innerHTML = '';
+            submitBtn.disabled = true;
 
-            posts.unshift(newPost);
-            localStorage.setItem('posts', JSON.stringify(posts));
+            try {
+                await window.firebaseDB.addPost({
+                    type: currentPostType,
+                    title: title,
+                    content: content,
+                    author: currentUser.nickname,
+                    comments: []
+                });
 
-            // Deduct secret question if type is secret
-            if (currentPostType === 'secret') {
-                let users = JSON.parse(localStorage.getItem('users') || '[]');
-                const userIndex = users.findIndex(u => u.nickname === currentUser.nickname);
-                users[userIndex].secretQuestions--;
-                localStorage.setItem('users', JSON.stringify(users));
-                localStorage.setItem('currentUser', JSON.stringify(users[userIndex]));
-                currentUser = users[userIndex];
-            }
+                // Deduct secret question if type is secret
+                if (currentPostType === 'secret') {
+                    await window.firebaseDB.updateUser(currentUser.nickname, {
+                        secretQuestions: (userData.secretQuestions || 0) - 1
+                    });
+                    userData.secretQuestions = (userData.secretQuestions || 0) - 1;
+                }
 
-            // Add points for community posts
-            if (currentPostType === 'tips' || currentPostType === 'free') {
-                let users = JSON.parse(localStorage.getItem('users') || '[]');
-                const userIndex = users.findIndex(u => u.nickname === currentUser.nickname);
-                users[userIndex].secretQuestions = (users[userIndex].secretQuestions || 0) + 2;
-                localStorage.setItem('users', JSON.stringify(users));
-                localStorage.setItem('currentUser', JSON.stringify(users[userIndex]));
-                currentUser = users[userIndex];
-            }
+                // Add points for community posts
+                if (currentPostType === 'tips' || currentPostType === 'free') {
+                    await window.firebaseDB.updateUser(currentUser.nickname, {
+                        secretQuestions: (userData.secretQuestions || 0) + 2
+                    });
+                    userData.secretQuestions = (userData.secretQuestions || 0) + 2;
+                }
 
-            alert('게시글이 등록되었습니다!');
-            closePostModal();
-            loadPosts(currentPostType);
-            initWriteButtons();
-        }
-
-        function loadPosts(type) {
-            const posts = JSON.parse(localStorage.getItem('posts') || '[]');
-            const filteredPosts = posts.filter(p => p.type === type);
-            const listId = type + 'List';
-            const list = document.getElementById(listId);
-
-            if (filteredPosts.length === 0) {
-                list.innerHTML = '<p style="color: var(--gray); padding: 40px; text-align: center;">게시글이 없습니다.</p>';
-                return;
-            }
-
-            list.innerHTML = filteredPosts.map(post => `
-                <div class="admin-panel" style="cursor: pointer; margin-bottom: 15px;" onclick="showPostDetail(${post.id})">
-                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
-                        <h4 style="margin: 0;">${post.title}</h4>
-                        <span style="color: var(--gray); font-size: 14px; white-space: nowrap; margin-left: 10px;">${new Date(post.createdAt).toLocaleDateString('ko-KR')}</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="color: var(--gray); font-size: 14px;">${post.author}</span>
-                        <span style="color: var(--gray); font-size: 14px;">💬 ${post.comments.length}</span>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function showPostDetail(postId) {
-            const posts = JSON.parse(localStorage.getItem('posts') || '[]');
-            const post = posts.find(p => p.id === postId);
-
-            if (!post) return;
-
-            const detailHtml = `
-                <div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border);">
-                    <h3 style="margin-bottom: 10px;">${post.title}</h3>
-                    <div style="display: flex; gap: 15px; color: var(--gray); font-size: 14px; margin-bottom: 15px;">
-                        <span>${post.author}</span>
-                        <span>${new Date(post.createdAt).toLocaleString('ko-KR')}</span>
-                    </div>
-                    <p style="line-height: 1.8; white-space: pre-wrap;">${post.content}</p>
-                </div>
+                alertDiv.innerHTML = '<div class="alert alert-success">게시글이 등록되었습니다!</div>';
                 
-                <div style="margin-bottom: 20px;">
-                    <h4 style="margin-bottom: 15px;">댓글 ${post.comments.length}개</h4>
-                    <div id="commentsList">
-                        ${post.comments.map(comment => `
-                            <div style="background: var(--light-gray); padding: 15px; border-radius: 8px; margin-bottom: 10px;">
-                                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                                    <strong>${comment.author}</strong>
-                                    <span style="color: var(--gray); font-size: 12px;">${new Date(comment.createdAt).toLocaleString('ko-KR')}</span>
-                                </div>
-                                <p style="margin: 0;">${comment.content}</p>
+                setTimeout(async () => {
+                    closePostModal();
+                    await loadPosts(currentPostType);
+                    initWriteButtons();
+                    submitBtn.disabled = false;
+                }, 1500);
+            } catch (error) {
+                console.error('Error submitting post:', error);
+                alertDiv.innerHTML = '<div class="alert alert-error">게시글 등록 중 오류가 발생했습니다.</div>';
+                submitBtn.disabled = false;
+            }
+        };
+
+        async function loadPosts(type) {
+            try {
+                const posts = await window.firebaseDB.getPosts(type);
+                const listId = type + 'List';
+                const list = document.getElementById(listId);
+
+                if (posts.length === 0) {
+                    list.innerHTML = '<p style="color: var(--gray); padding: 40px; text-align: center;">게시글이 없습니다.</p>';
+                    return;
+                }
+
+                list.innerHTML = posts.map(post => {
+                    const postDate = post.createdAt?.toDate ? post.createdAt.toDate() : new Date();
+                    return `
+                        <div class="admin-panel" style="cursor: pointer; margin-bottom: 15px; transition: transform 0.2s;" onclick="showPostDetail('${post.id}')" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                                <h4 style="margin: 0; flex: 1;">${post.title}</h4>
+                                <span style="color: var(--gray); font-size: 14px; white-space: nowrap; margin-left: 10px;">${postDate.toLocaleDateString('ko-KR')}</span>
                             </div>
-                        `).join('')}
-                    </div>
-                </div>
-                
-                ${currentUser ? `
-                    <form onsubmit="addComment(event, ${postId})">
-                        <div class="form-group">
-                            <label>댓글 작성</label>
-                            <textarea id="commentContent" required style="min-height: 80px;"></textarea>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="color: var(--gray); font-size: 14px;">${post.author}</span>
+                                <span style="color: var(--gray); font-size: 14px;">💬 ${(post.comments || []).length}</span>
+                            </div>
                         </div>
-                        <button type="submit" class="btn btn-primary">댓글 등록</button>
-                    </form>
-                ` : '<p style="color: var(--gray); text-align: center;">댓글을 작성하려면 로그인이 필요합니다.</p>'}
-            `;
-
-            document.getElementById('postDetail').innerHTML = detailHtml;
-            document.getElementById('detailModal').classList.add('active');
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Error loading posts:', error);
+                document.getElementById(type + 'List').innerHTML = '<p style="color: var(--danger); padding: 20px; text-align: center;">게시글을 불러오는 중 오류가 발생했습니다.</p>';
+            }
         }
 
-        function closeDetailModal() {
+        window.showPostDetail = async function(postId) {
+            try {
+                const post = await window.firebaseDB.getPost(postId);
+                if (!post) return;
+
+                const postDate = post.createdAt?.toDate ? post.createdAt.toDate() : new Date();
+
+                const detailHtml = `
+                    <div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border);">
+                        <h3 style="margin-bottom: 10px;">${post.title}</h3>
+                        <div style="display: flex; gap: 15px; color: var(--gray); font-size: 14px; margin-bottom: 15px;">
+                            <span>${post.author}</span>
+                            <span>${postDate.toLocaleString('ko-KR')}</span>
+                        </div>
+                        <p style="line-height: 1.8; white-space: pre-wrap;">${post.content}</p>
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <h4 style="margin-bottom: 15px;">댓글 ${(post.comments || []).length}개</h4>
+                        <div id="commentsList">
+                            ${(post.comments || []).map(comment => `
+                                <div style="background: var(--light-gray); padding: 15px; border-radius: 8px; margin-bottom: 10px;">
+                                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                        <strong>${comment.author}</strong>
+                                        <span style="color: var(--gray); font-size: 12px;">${new Date(comment.createdAt).toLocaleString('ko-KR')}</span>
+                                    </div>
+                                    <p style="margin: 0; white-space: pre-wrap;">${comment.content}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    
+                    ${currentUser ? `
+                        <form onsubmit="addComment(event, '${postId}')">
+                            <div class="form-group">
+                                <label>댓글 작성</label>
+                                <textarea id="commentContent" required style="min-height: 80px;"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary">댓글 등록</button>
+                        </form>
+                    ` : '<p style="color: var(--gray); text-align: center;">댓글을 작성하려면 로그인이 필요합니다.</p>'}
+                `;
+
+                document.getElementById('postDetail').innerHTML = detailHtml;
+                document.getElementById('detailModal').classList.add('active');
+            } catch (error) {
+                console.error('Error showing post detail:', error);
+                alert('게시글을 불러오는 중 오류가 발생했습니다.');
+            }
+        };
+
+        window.closeDetailModal = function() {
             document.getElementById('detailModal').classList.remove('active');
-        }
+        };
 
-        function addComment(e, postId) {
+        window.addComment = async function(e, postId) {
             e.preventDefault();
             
             const content = document.getElementById('commentContent').value.trim();
             if (!content) return;
 
-            let posts = JSON.parse(localStorage.getItem('posts') || '[]');
-            const postIndex = posts.findIndex(p => p.id === postId);
-            
-            posts[postIndex].comments.push({
-                id: Date.now(),
-                author: currentUser.nickname,
-                content: content,
-                createdAt: new Date().toISOString()
-            });
+            try {
+                await window.firebaseDB.addComment(postId, {
+                    author: currentUser.nickname,
+                    content: content
+                });
 
-            localStorage.setItem('posts', JSON.stringify(posts));
+                // Add secret question for comment
+                await window.firebaseDB.updateUser(currentUser.nickname, {
+                    secretQuestions: (userData.secretQuestions || 0) + 1
+                });
+                userData.secretQuestions = (userData.secretQuestions || 0) + 1;
 
-            // Add secret question for comment
-            let users = JSON.parse(localStorage.getItem('users') || '[]');
-            const userIndex = users.findIndex(u => u.nickname === currentUser.nickname);
-            users[userIndex].secretQuestions = (users[userIndex].secretQuestions || 0) + 1;
-            localStorage.setItem('users', JSON.stringify(users));
-            localStorage.setItem('currentUser', JSON.stringify(users[userIndex]));
-            currentUser = users[userIndex];
-
-            alert('댓글이 등록되었습니다! 시크릿 질문권 1개를 획득했습니다.');
-            showPostDetail(postId);
-            initWriteButtons();
-        }
-
-        // Initialize
-        initAuth();
-        
-        // Set initial tab
-        document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.admin-content').forEach(c => c.classList.remove('active'));
-        
-        const tabButtons = ['notice', 'secret', 'tips', 'free', 'qna'];
-        const tabIndex = tabButtons.indexOf(initialTab);
-        if (tabIndex >= 0) {
-            document.querySelectorAll('.admin-tab')[tabIndex].classList.add('active');
-            document.getElementById(initialTab + '-content').classList.add('active');
-            loadPosts(initialTab);
-        }
-
-        // Load all posts
-        tabButtons.forEach(tab => loadPosts(tab));
+                alert('댓글이 등록되었습니다! 시크릿 질문권 1개를 획득했습니다.');
+                
+                // Reload post detail
+                const post = await window.firebaseDB.getPost(postId);
+                await showPostDetail(postId);
+                
+                // Reload posts list
+                await loadPosts(post.type);
+                initWriteButtons();
+            } catch (error) {
+                console.error('Error adding comment:', error);
+                alert('댓글 등록 중 오류가 발생했습니다.');
+            }
+        };
     </script>
 </body>
-  </html>
+    </html>
